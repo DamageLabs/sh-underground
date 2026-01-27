@@ -1,34 +1,42 @@
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Typography, Paper, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EditLocationIcon from '@mui/icons-material/EditLocation';
 import LocationMap from '../components/LocationMap';
 import { useAuth } from '../contexts/AuthContext';
-
-const USERS_KEY = 'location_app_users';
+import { api } from '../api';
 
 function MapView() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [otherUsers, setOtherUsers] = useState([]);
 
   const hasLocation = user?.location && user?.coordinates;
 
-  const otherUsers = useMemo(() => {
-    const storedUsers = localStorage.getItem(USERS_KEY);
-    if (!storedUsers) return [];
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const users = await api.getAllUsers();
+        const filtered = users
+          .filter(u => u.username !== user.username && u.coordinates)
+          .map(u => ({
+            id: u.username,
+            username: u.username,
+            fullName: u.fullName,
+            coordinates: u.coordinates,
+            location: u.location,
+          }));
+        setOtherUsers(filtered);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+    };
 
-    const users = JSON.parse(storedUsers);
-    return Object.values(users)
-      .filter(u => u.username !== user.username && u.coordinates)
-      .map(u => ({
-        id: u.username,
-        username: u.username,
-        fullName: u.fullName,
-        coordinates: u.coordinates,
-        location: u.location,
-      }));
-  }, [user.username]);
+    if (user?.username) {
+      fetchUsers();
+    }
+  }, [user?.username]);
 
   return (
     <Box>

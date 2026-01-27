@@ -32,7 +32,7 @@ function Login() {
 
     setLoading(true);
     try {
-      login(username, password);
+      await login(username, password);
       navigate('/profile');
     } catch (err) {
       setError(err.message);

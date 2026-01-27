@@ -29,12 +29,16 @@ function Profile() {
   const [success, setSuccess] = useState('');
   const [geocodedResult, setGeocodedResult] = useState(null);
 
-  const handleSaveProfile = () => {
-    updateProfile({ fullName });
-    setSuccess('Profile saved successfully!');
+  const handleSaveProfile = async () => {
+    try {
+      await updateProfile({ fullName });
+      setSuccess('Profile saved successfully!');
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     setError('');
     setSuccess('');
 
@@ -54,7 +58,7 @@ function Profile() {
     }
 
     try {
-      changePassword(currentPassword, newPassword);
+      await changePassword(currentPassword, newPassword);
       setSuccess('Password changed successfully!');
       setCurrentPassword('');
       setNewPassword('');
@@ -117,15 +121,19 @@ function Profile() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!geocodedResult) {
       setError('Please search for a location first');
       return;
     }
 
-    updateLocation(geocodedResult.formattedAddress, geocodedResult.coordinates);
-    setSuccess('Location saved successfully!');
-    setGeocodedResult(null);
+    try {
+      await updateLocation(geocodedResult.formattedAddress, geocodedResult.coordinates);
+      setSuccess('Location saved successfully!');
+      setGeocodedResult(null);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleKeyPress = (e) => {

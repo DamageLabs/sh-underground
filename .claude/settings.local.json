@@ -6,7 +6,18 @@
       "Bash(npm run dev)",
       "Bash(cat:*)",
       "Bash(nginx -t:*)",
-      "Bash(systemctl reload:*)"
+      "Bash(systemctl reload:*)",
+      "Bash(npm install:*)",
+      "Bash(pm2 start:*)",
+      "Bash(pm2 save:*)",
+      "Bash(curl:*)",
+      "Bash(pm2 logs:*)",
+      "Bash(pm2 delete:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs:*)",
+      "Bash(pm2 restart:*)",
+      "Bash(systemctl restart:*)",
+      "Bash(pm2 show:*)"
     ]
   }
 }

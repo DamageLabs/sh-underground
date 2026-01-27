@@ -86,24 +86,24 @@ function LocationMap({ coordinates, locationName, username, fullName, otherUsers
         >
           {infoWindowOpen && (
             <InfoWindowF onCloseClick={handleInfoWindowClose}>
-              <Box sx={{ p: 1 }}>
+              <div style={{ padding: '8px', color: '#000' }}>
                 {fullName && (
-                  <Typography variant="subtitle1" fontWeight="bold">
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
                     {fullName}
-                  </Typography>
+                  </div>
                 )}
                 {username && (
-                  <Typography variant="body2" color={fullName ? 'text.secondary' : 'text.primary'} fontWeight={fullName ? 'normal' : 'bold'}>
-                    {username}
-                  </Typography>
+                  <div style={{ fontSize: '14px', color: fullName ? '#666' : '#000', fontWeight: fullName ? 'normal' : 'bold' }}>
+                    @{username}
+                  </div>
                 )}
-                <Typography variant="body2">
+                <div style={{ fontSize: '14px', marginTop: '4px' }}>
                   {locationName || 'Selected location'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
+                </div>
+                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
                   {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
-                </Typography>
-              </Box>
+                </div>
+              </div>
             </InfoWindowF>
           )}
         </MarkerF>
@@ -123,14 +123,19 @@ function LocationMap({ coordinates, locationName, username, fullName, otherUsers
         >
           {selectedUser?.id === person.id && (
             <InfoWindowF onCloseClick={() => setSelectedUser(null)}>
-              <Box sx={{ p: 1 }}>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  {person.username}
-                </Typography>
-                <Typography variant="body2">
+              <div style={{ padding: '8px', color: '#000' }}>
+                {person.fullName && (
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
+                    {person.fullName}
+                  </div>
+                )}
+                <div style={{ fontSize: '14px', color: person.fullName ? '#666' : '#000', fontWeight: person.fullName ? 'normal' : 'bold' }}>
+                  @{person.username}
+                </div>
+                <div style={{ fontSize: '14px', marginTop: '4px' }}>
                   {person.location}
-                </Typography>
-              </Box>
+                </div>
+              </div>
             </InfoWindowF>
           )}
         </MarkerF>

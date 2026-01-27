@@ -48,7 +48,7 @@ function Register() {
 
     setLoading(true);
     try {
-      register(username, password);
+      await register(username, password);
       navigate('/profile');
     } catch (err) {
       setError(err.message);

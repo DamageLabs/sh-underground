@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../api';
 
 const AuthContext = createContext(null);
 
-const USERS_KEY = 'location_app_users';
 const CURRENT_USER_KEY = 'location_app_current_user';
 const ADMIN_USERS = ['guntharp'];
 
@@ -11,68 +11,40 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem(CURRENT_USER_KEY);
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      parsed.isAdmin = ADMIN_USERS.includes(parsed.username);
-      setUser(parsed);
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      const storedUser = localStorage.getItem(CURRENT_USER_KEY);
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        try {
+          // Refresh user data from server
+          const freshUser = await api.getUser(parsed.username);
+          freshUser.isAdmin = ADMIN_USERS.includes(freshUser.username);
+          setUser(freshUser);
+          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(freshUser));
+        } catch {
+          // If server fails, use cached data
+          parsed.isAdmin = ADMIN_USERS.includes(parsed.username);
+          setUser(parsed);
+        }
+      }
+      setLoading(false);
+    };
+    initAuth();
   }, []);
 
-  const getUsers = () => {
-    const users = localStorage.getItem(USERS_KEY);
-    return users ? JSON.parse(users) : {};
-  };
-
-  const saveUsers = (users) => {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  };
-
-  const register = (username, password) => {
-    const users = getUsers();
-
-    if (users[username]) {
-      throw new Error('Username already exists');
-    }
-
-    const newUser = {
-      username,
-      password,
-      fullName: '',
-      location: null,
-      coordinates: null,
-    };
-
-    users[username] = newUser;
-    saveUsers(users);
-
-    const userSession = { username, fullName: '', location: null, coordinates: null, isAdmin: ADMIN_USERS.includes(username) };
+  const register = async (username, password) => {
+    const userSession = await api.register(username, password);
+    userSession.isAdmin = ADMIN_USERS.includes(username);
     setUser(userSession);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession));
-
     return userSession;
   };
 
-  const login = (username, password) => {
-    const users = getUsers();
-    const storedUser = users[username];
-
-    if (!storedUser || storedUser.password !== password) {
-      throw new Error('Invalid username or password');
-    }
-
-    const userSession = {
-      username: storedUser.username,
-      fullName: storedUser.fullName || '',
-      location: storedUser.location,
-      coordinates: storedUser.coordinates,
-      isAdmin: ADMIN_USERS.includes(storedUser.username),
-    };
-
+  const login = async (username, password) => {
+    const userSession = await api.login(username, password);
+    userSession.isAdmin = ADMIN_USERS.includes(username);
     setUser(userSession);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession));
-
     return userSession;
   };
 
@@ -81,43 +53,22 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(CURRENT_USER_KEY);
   };
 
-  const updateLocation = (location, coordinates) => {
-    const users = getUsers();
-
-    if (users[user.username]) {
-      users[user.username].location = location;
-      users[user.username].coordinates = coordinates;
-      saveUsers(users);
-    }
-
-    const updatedUser = { ...user, location, coordinates };
+  const updateLocation = async (location, coordinates) => {
+    const updatedUser = await api.updateUser(user.username, { location, coordinates });
+    updatedUser.isAdmin = user.isAdmin;
     setUser(updatedUser);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
   };
 
-  const updateProfile = (profileData) => {
-    const users = getUsers();
-
-    if (users[user.username]) {
-      users[user.username] = { ...users[user.username], ...profileData };
-      saveUsers(users);
-    }
-
-    const updatedUser = { ...user, ...profileData };
+  const updateProfile = async (profileData) => {
+    const updatedUser = await api.updateUser(user.username, profileData);
+    updatedUser.isAdmin = user.isAdmin;
     setUser(updatedUser);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
   };
 
-  const changePassword = (currentPassword, newPassword) => {
-    const users = getUsers();
-    const storedUser = users[user.username];
-
-    if (!storedUser || storedUser.password !== currentPassword) {
-      throw new Error('Current password is incorrect');
-    }
-
-    users[user.username].password = newPassword;
-    saveUsers(users);
+  const changePassword = async (currentPassword, newPassword) => {
+    await api.changePassword(user.username, currentPassword, newPassword);
   };
 
   const value = {
