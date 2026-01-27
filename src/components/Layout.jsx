@@ -20,18 +20,20 @@ import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import MapIcon from '@mui/icons-material/Map';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 240;
 
-const menuItems = [
-  { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
-  { text: 'Map View', icon: <MapIcon />, path: '/map' },
-];
-
 function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
+
+  const menuItems = [
+    { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
+    { text: 'Map View', icon: <MapIcon />, path: '/map' },
+    ...(isAdmin ? [{ text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' }] : []),
+  ];
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();

@@ -4,6 +4,7 @@ const AuthContext = createContext(null);
 
 const USERS_KEY = 'location_app_users';
 const CURRENT_USER_KEY = 'location_app_current_user';
+const ADMIN_USERS = ['guntharp'];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -12,7 +13,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const storedUser = localStorage.getItem(CURRENT_USER_KEY);
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsed = JSON.parse(storedUser);
+      parsed.isAdmin = ADMIN_USERS.includes(parsed.username);
+      setUser(parsed);
     }
     setLoading(false);
   }, []);
@@ -44,7 +47,7 @@ export function AuthProvider({ children }) {
     users[username] = newUser;
     saveUsers(users);
 
-    const userSession = { username, fullName: '', location: null, coordinates: null };
+    const userSession = { username, fullName: '', location: null, coordinates: null, isAdmin: ADMIN_USERS.includes(username) };
     setUser(userSession);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession));
 
@@ -64,6 +67,7 @@ export function AuthProvider({ children }) {
       fullName: storedUser.fullName || '',
       location: storedUser.location,
       coordinates: storedUser.coordinates,
+      isAdmin: ADMIN_USERS.includes(storedUser.username),
     };
 
     setUser(userSession);
@@ -126,6 +130,7 @@ export function AuthProvider({ children }) {
     updateProfile,
     changePassword,
     isAuthenticated: !!user,
+    isAdmin: user?.isAdmin || false,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
