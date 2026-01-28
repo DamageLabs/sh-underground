@@ -12,7 +12,13 @@ const defaultCenter = {
   lng: -98.5795,
 };
 
-function LocationMap({ coordinates, locationName, username, fullName, otherUsers = [], onMapClick }) {
+const getPhotoUrl = (photoPath) => {
+  if (!photoPath) return null;
+  if (photoPath.startsWith('http')) return photoPath;
+  return `/api${photoPath}`;
+};
+
+function LocationMap({ coordinates, locationName, username, fullName, markerColor = 'red', profilePhoto = null, otherUsers = [], onMapClick }) {
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
@@ -79,29 +85,44 @@ function LocationMap({ coordinates, locationName, username, fullName, otherUsers
           onClick={handleMarkerClick}
           label={username ? { text: username, color: '#000', fontWeight: 'bold', fontSize: '14px' } : undefined}
           icon={{
-            url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            url: `http://maps.google.com/mapfiles/ms/icons/${markerColor}-dot.png`,
             scaledSize: new window.google.maps.Size(50, 50),
             labelOrigin: new window.google.maps.Point(25, 60),
           }}
         >
           {infoWindowOpen && (
             <InfoWindowF onCloseClick={handleInfoWindowClose}>
-              <div style={{ padding: '8px', color: '#000' }}>
-                {fullName && (
-                  <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
-                    {fullName}
-                  </div>
+              <div style={{ padding: '8px', color: '#000', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                {profilePhoto && (
+                  <img
+                    src={getPhotoUrl(profilePhoto)}
+                    alt={username}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
                 )}
-                {username && (
-                  <div style={{ fontSize: '14px', color: fullName ? '#666' : '#000', fontWeight: fullName ? 'normal' : 'bold' }}>
-                    @{username}
+                <div>
+                  {fullName && (
+                    <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
+                      {fullName}
+                    </div>
+                  )}
+                  {username && (
+                    <div style={{ fontSize: '14px', color: fullName ? '#666' : '#000', fontWeight: fullName ? 'normal' : 'bold' }}>
+                      @{username}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                    {locationName || 'Selected location'}
                   </div>
-                )}
-                <div style={{ fontSize: '14px', marginTop: '4px' }}>
-                  {locationName || 'Selected location'}
-                </div>
-                <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                  {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                    {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+                  </div>
                 </div>
               </div>
             </InfoWindowF>
@@ -116,24 +137,39 @@ function LocationMap({ coordinates, locationName, username, fullName, otherUsers
           onClick={() => setSelectedUser(person)}
           label={{ text: person.username, color: '#000', fontWeight: 'bold', fontSize: '12px' }}
           icon={{
-            url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+            url: `http://maps.google.com/mapfiles/ms/icons/${person.markerColor || 'blue'}-dot.png`,
             scaledSize: new window.google.maps.Size(40, 40),
             labelOrigin: new window.google.maps.Point(20, 50),
           }}
         >
           {selectedUser?.id === person.id && (
             <InfoWindowF onCloseClick={() => setSelectedUser(null)}>
-              <div style={{ padding: '8px', color: '#000' }}>
-                {person.fullName && (
-                  <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
-                    {person.fullName}
-                  </div>
+              <div style={{ padding: '8px', color: '#000', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                {person.profilePhoto && (
+                  <img
+                    src={getPhotoUrl(person.profilePhoto)}
+                    alt={person.username}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
                 )}
-                <div style={{ fontSize: '14px', color: person.fullName ? '#666' : '#000', fontWeight: person.fullName ? 'normal' : 'bold' }}>
-                  @{person.username}
-                </div>
-                <div style={{ fontSize: '14px', marginTop: '4px' }}>
-                  {person.location}
+                <div>
+                  {person.fullName && (
+                    <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
+                      {person.fullName}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '14px', color: person.fullName ? '#666' : '#000', fontWeight: person.fullName ? 'normal' : 'bold' }}>
+                    @{person.username}
+                  </div>
+                  <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                    {person.location}
+                  </div>
                 </div>
               </div>
             </InfoWindowF>

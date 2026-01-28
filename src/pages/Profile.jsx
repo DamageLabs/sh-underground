@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -9,17 +9,39 @@ import {
   CircularProgress,
   Card,
   CardContent,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Avatar,
+  IconButton,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../api';
+
+const MARKER_COLOR_LABELS = {
+  red: 'Red',
+  blue: 'Blue',
+  green: 'Green',
+  yellow: 'Yellow',
+  purple: 'Purple',
+  pink: 'Pink',
+  orange: 'Orange',
+  ltblue: 'Light Blue',
+};
 
 function Profile() {
-  const { user, updateLocation, updateProfile, changePassword } = useAuth();
+  const { user, updateLocation, updateProfile, changePassword, refreshUser } = useAuth();
   const [fullName, setFullName] = useState(user?.fullName || '');
+  const [markerColor, setMarkerColor] = useState(user?.markerColor || 'red');
+  const [markerColors, setMarkerColors] = useState([]);
   const [locationInput, setLocationInput] = useState(user?.location || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -28,10 +50,56 @@ function Profile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [geocodedResult, setGeocodedResult] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    api.getMarkerColors().then(setMarkerColors).catch(() => {
+      setMarkerColors(['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'orange', 'ltblue']);
+    });
+  }, []);
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    setError('');
+
+    try {
+      await api.uploadProfilePhoto(user.username, file);
+      await refreshUser();
+      setSuccess('Profile photo updated!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    try {
+      await api.deleteProfilePhoto(user.username);
+      await refreshUser();
+      setSuccess('Profile photo removed!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const getPhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    if (photoPath.startsWith('http')) return photoPath;
+    // Use /api prefix to go through the same proxy as API calls
+    return `/api${photoPath}`;
+  };
 
   const handleSaveProfile = async () => {
     try {
-      await updateProfile({ fullName });
+      await updateProfile({ fullName, markerColor });
       setSuccess('Profile saved successfully!');
     } catch (err) {
       setError(err.message);
@@ -165,14 +233,91 @@ function Profile() {
           <PersonIcon color="primary" />
           Personal Information
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+
+        {/* Profile Photo Section */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              src={getPhotoUrl(user?.profilePhoto)}
+              sx={{ width: 80, height: 80, fontSize: 32 }}
+            >
+              {user?.username?.[0]?.toUpperCase()}
+            </Avatar>
+            {uploadingPhoto && (
+              <CircularProgress
+                size={80}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  color: 'primary.main',
+                }}
+              />
+            )}
+          </Box>
+          <Box>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handlePhotoUpload}
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: 'none' }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PhotoCameraIcon />}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              sx={{ mr: 1 }}
+            >
+              {user?.profilePhoto ? 'Change Photo' : 'Upload Photo'}
+            </Button>
+            {user?.profilePhoto && (
+              <IconButton
+                size="small"
+                color="error"
+                onClick={handleDeletePhoto}
+                title="Remove photo"
+              >
+                <DeleteIcon />
+              </IconButton>
+            )}
+            <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+              Max 5MB. JPEG, PNG, GIF, or WebP.
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
           <TextField
-            fullWidth
+            sx={{ flex: 1, minWidth: 200 }}
             label="Full Name"
             placeholder="Enter your full name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
           />
+          <FormControl sx={{ minWidth: 150 }}>
+            <InputLabel>Marker Icon</InputLabel>
+            <Select
+              value={markerColor}
+              label="Marker Icon"
+              onChange={(e) => setMarkerColor(e.target.value)}
+            >
+              {markerColors.map((color) => (
+                <MenuItem key={color} value={color}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <img
+                      src={`http://maps.google.com/mapfiles/ms/icons/${color}-dot.png`}
+                      alt={color}
+                      style={{ width: 20, height: 20 }}
+                    />
+                    {MARKER_COLOR_LABELS[color] || color}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Button
             variant="contained"
             onClick={handleSaveProfile}

@@ -71,6 +71,14 @@ export function AuthProvider({ children }) {
     await api.changePassword(user.username, currentPassword, newPassword);
   };
 
+  const refreshUser = async () => {
+    if (!user?.username) return;
+    const freshUser = await api.getUser(user.username);
+    freshUser.isAdmin = user.isAdmin;
+    setUser(freshUser);
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(freshUser));
+  };
+
   const value = {
     user,
     loading,
@@ -80,6 +88,7 @@ export function AuthProvider({ children }) {
     updateLocation,
     updateProfile,
     changePassword,
+    refreshUser,
     isAuthenticated: !!user,
     isAdmin: user?.isAdmin || false,
   };

@@ -17,7 +17,10 @@
       "Bash(xargs:*)",
       "Bash(pm2 restart:*)",
       "Bash(systemctl restart:*)",
-      "Bash(pm2 show:*)"
+      "Bash(pm2 show:*)",
+      "Bash(ss:*)",
+      "Bash(node:*)",
+      "Bash(fuser:*)"
     ]
   }
 }

@@ -32,3 +32,5 @@ Thumbs.db
 
 # Sensitive data
 server/data/users.json
+server/data/users.db
+server/uploads/

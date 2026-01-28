@@ -1,5 +1,19 @@
 const API_BASE = '/api';
 
+// Get current username from localStorage for auth headers
+const getAuthHeaders = () => {
+  const currentUser = localStorage.getItem('location_app_current_user');
+  if (currentUser) {
+    try {
+      const user = JSON.parse(currentUser);
+      return { 'x-username': user.username };
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
 export const api = {
   async register(username, password) {
     const res = await fetch(`${API_BASE}/register`, {
@@ -72,7 +86,9 @@ export const api = {
   },
 
   async getAdminUsers() {
-    const res = await fetch(`${API_BASE}/admin/users`);
+    const res = await fetch(`${API_BASE}/admin/users`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || 'Failed to get users');
@@ -83,6 +99,7 @@ export const api = {
   async deleteUser(username) {
     const res = await fetch(`${API_BASE}/admin/user/${username}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!res.ok) {
       const data = await res.json();
@@ -92,7 +109,9 @@ export const api = {
   },
 
   async exportUsers() {
-    const res = await fetch(`${API_BASE}/admin/export`);
+    const res = await fetch(`${API_BASE}/admin/export`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) {
       throw new Error('Failed to export users');
     }
@@ -102,12 +121,46 @@ export const api = {
   async importUsers(users, mode = 'merge') {
     const res = await fetch(`${API_BASE}/admin/import`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ users, mode }),
     });
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || 'Failed to import users');
+    }
+    return res.json();
+  },
+
+  async getMarkerColors() {
+    const res = await fetch(`${API_BASE}/marker-colors`);
+    if (!res.ok) {
+      throw new Error('Failed to get marker colors');
+    }
+    return res.json();
+  },
+
+  async uploadProfilePhoto(username, file) {
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    const res = await fetch(`${API_BASE}/user/${username}/photo`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to upload photo');
+    }
+    return res.json();
+  },
+
+  async deleteProfilePhoto(username) {
+    const res = await fetch(`${API_BASE}/user/${username}/photo`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to delete photo');
     }
     return res.json();
   },

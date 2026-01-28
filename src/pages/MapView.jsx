@@ -26,6 +26,8 @@ function MapView() {
             fullName: u.fullName,
             coordinates: u.coordinates,
             location: u.location,
+            markerColor: u.markerColor || 'red',
+            profilePhoto: u.profilePhoto,
           }));
         setOtherUsers(filtered);
       } catch (err) {
@@ -78,6 +80,8 @@ function MapView() {
               locationName={user.location}
               username={user.username}
               fullName={user.fullName}
+              markerColor={user.markerColor}
+              profilePhoto={user.profilePhoto}
               otherUsers={otherUsers}
             />
           </Paper>
