@@ -29,3 +29,6 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Sensitive data
+server/data/users.json
