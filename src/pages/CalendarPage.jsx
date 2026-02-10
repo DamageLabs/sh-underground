@@ -10,6 +10,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PersonIcon from '@mui/icons-material/Person';
@@ -133,6 +134,29 @@ function CalendarPage() {
     }
   };
 
+  const handleDownloadIcs = async (evt) => {
+    const url = api.getEventIcsUrl(evt.id);
+    const currentUser = localStorage.getItem('location_app_current_user');
+    const headers = {};
+    if (currentUser) {
+      try { headers['x-username'] = JSON.parse(currentUser).username; } catch {}
+    }
+    try {
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${evt.title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-').toLowerCase()}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const formatTime = (t) => {
     if (!t) return 'All day';
     const [h, m] = t.split(':').map(Number);
@@ -247,6 +271,7 @@ function CalendarPage() {
                     color: evt.visibility === 'community' ? 'primary.main' : 'text.secondary',
                   }}
                 />
+                <IconButton size="small" onClick={() => handleDownloadIcs(evt)} title="Download .ics"><DownloadIcon fontSize="small" /></IconButton>
                 {evt.created_by === user?.username && (
                   <>
                     <IconButton size="small" onClick={() => openEdit(evt)}><EditIcon fontSize="small" /></IconButton>

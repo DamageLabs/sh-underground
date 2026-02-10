@@ -631,6 +631,79 @@ app.post('/api/admin/events/import', requireAdmin, (req, res) => {
   res.json({ success: true, count });
 });
 
+// Calendar Events: Download single event as .ics
+app.get('/api/events/:id/ics', requireAuth, (req, res) => {
+  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  if (event.visibility === 'personal' && event.created_by !== req.user.username) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const [yr, mo, dy] = event.event_date.split('-');
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+
+  let dtStart, dtEnd;
+  if (event.event_time) {
+    const [hh, mm] = event.event_time.split(':');
+    // Store as Central Time (America/Chicago)
+    dtStart = `TZID=America/Chicago:${yr}${mo}${dy}T${pad(hh)}${pad(mm)}00`;
+    // Default 1-hour duration
+    const endH = (parseInt(hh, 10) + 1) % 24;
+    dtEnd = `TZID=America/Chicago:${yr}${mo}${dy}T${pad(endH)}${pad(mm)}00`;
+  } else {
+    // All-day event
+    dtStart = `VALUE=DATE:${yr}${mo}${dy}`;
+    const nextDay = new Date(parseInt(yr), parseInt(mo) - 1, parseInt(dy) + 1);
+    dtEnd = `VALUE=DATE:${nextDay.getFullYear()}${pad(nextDay.getMonth() + 1)}${pad(nextDay.getDate())}`;
+  }
+
+  const escText = (s) => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//SH Underground//Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VTIMEZONE',
+    'TZID:America/Chicago',
+    'BEGIN:STANDARD',
+    'DTSTART:19701101T020000',
+    'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+    'TZOFFSETFROM:-0500',
+    'TZOFFSETTO:-0600',
+    'TZNAME:CST',
+    'END:STANDARD',
+    'BEGIN:DAYLIGHT',
+    'DTSTART:19700308T020000',
+    'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+    'TZOFFSETFROM:-0600',
+    'TZOFFSETTO:-0500',
+    'TZNAME:CDT',
+    'END:DAYLIGHT',
+    'END:VTIMEZONE',
+    'BEGIN:VEVENT',
+    `UID:event-${event.id}@sh-underground`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;${dtStart}`,
+    `DTEND;${dtEnd}`,
+    `SUMMARY:${escText(event.title)}`,
+    `DESCRIPTION:${escText(event.description)}`,
+    `LOCATION:${escText(event.location)}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const filename = event.title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '-').toLowerCase();
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}.ics"`);
+  res.send(ics);
+});
+
 // Calendar Events: List events for a month
 app.get('/api/events', requireAuth, (req, res) => {
   const { month } = req.query; // YYYY-MM

@@ -222,6 +222,10 @@ export const api = {
     return res.json();
   },
 
+  getEventIcsUrl(id) {
+    return `${API_BASE}/events/${id}/ics`;
+  },
+
   async getEvent(id) {
     const res = await fetch(`${API_BASE}/events/${id}`, {
       headers: getAuthHeaders(),
