@@ -589,6 +589,48 @@ app.delete('/api/admin/invite/:token', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// Admin: Export calendar events
+app.get('/api/admin/events/export', requireAdmin, (req, res) => {
+  const events = db.prepare('SELECT * FROM calendar_events ORDER BY event_date, event_time').all();
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', 'attachment; filename=calendar-events-export.json');
+  res.json(events);
+});
+
+// Admin: Import calendar events
+app.post('/api/admin/events/import', requireAdmin, (req, res) => {
+  const { events, mode } = req.body;
+  if (!Array.isArray(events)) {
+    return res.status(400).json({ error: 'events must be an array' });
+  }
+  if (mode === 'replace') {
+    db.prepare('DELETE FROM calendar_events').run();
+  }
+  const insert = db.prepare(
+    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const tx = db.transaction(() => {
+    for (const e of events) {
+      if (!e.title || !e.event_date) continue;
+      insert.run(
+        e.title,
+        e.event_date,
+        e.event_time || null,
+        e.description || '',
+        e.location || '',
+        e.visibility || 'personal',
+        e.created_by || req.adminUser.username,
+        e.created_at || Date.now(),
+        e.updated_at || Date.now()
+      );
+    }
+  });
+  tx();
+  const count = db.prepare('SELECT COUNT(*) as count FROM calendar_events').get().count;
+  res.json({ success: true, count });
+});
+
 // Calendar Events: List events for a month
 app.get('/api/events', requireAuth, (req, res) => {
   const { month } = req.query; // YYYY-MM

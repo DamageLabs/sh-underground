@@ -259,6 +259,29 @@ export const api = {
     return res.json();
   },
 
+  async exportEvents() {
+    const res = await fetch(`${API_BASE}/admin/events/export`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error('Failed to export events');
+    }
+    return res.json();
+  },
+
+  async importEvents(events, mode = 'merge') {
+    const res = await fetch(`${API_BASE}/admin/events/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ events, mode }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to import events');
+    }
+    return res.json();
+  },
+
   async deleteEvent(id) {
     const res = await fetch(`${API_BASE}/events/${id}`, {
       method: 'DELETE',

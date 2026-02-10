@@ -29,6 +29,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import BlockIcon from '@mui/icons-material/Block';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api';
@@ -48,7 +49,11 @@ function AdminDashboard() {
   const [invites, setInvites] = useState([]);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
   const [selectedInvite, setSelectedInvite] = useState(null);
+  const [calendarImportDialogOpen, setCalendarImportDialogOpen] = useState(false);
+  const [calendarImportData, setCalendarImportData] = useState(null);
+  const [calendarImportMode, setCalendarImportMode] = useState('merge');
   const fileInputRef = useRef(null);
+  const calendarFileInputRef = useRef(null);
 
   useEffect(() => {
     loadUsers();
@@ -193,6 +198,63 @@ function AdminDashboard() {
       setImportDialogOpen(false);
       setImportData(null);
       setSuccess(`Import successful: ${result.count} users total`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCalendarExport = async () => {
+    try {
+      const data = await api.exportEvents();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sh-underground-calendar-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSuccess('Calendar events exported successfully');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCalendarImportClick = () => {
+    calendarFileInputRef.current?.click();
+  };
+
+  const handleCalendarFileSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!Array.isArray(data)) {
+          setError('Calendar import file must contain an array of events');
+          return;
+        }
+        setCalendarImportData(data);
+        setCalendarImportDialogOpen(true);
+        setError('');
+      } catch {
+        setError('Invalid JSON file');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  };
+
+  const handleCalendarImportConfirm = async () => {
+    try {
+      const result = await api.importEvents(calendarImportData, calendarImportMode);
+      setCalendarImportDialogOpen(false);
+      setCalendarImportData(null);
+      setSuccess(`Calendar import successful: ${result.count} events total`);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.message);
@@ -449,6 +511,72 @@ function AdminDashboard() {
           <Button onClick={() => setRevokeDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleRevokeConfirm} color="error" variant="contained">
             Revoke
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Calendar Backup Section */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 4, mb: 2, flexWrap: 'wrap' }}>
+        <CalendarMonthIcon color="primary" />
+        <Typography variant="h6">
+          Calendar Backup
+        </Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          onClick={handleCalendarExport}
+          size="small"
+        >
+          Export Events
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<UploadIcon />}
+          onClick={handleCalendarImportClick}
+          size="small"
+        >
+          Import Events
+        </Button>
+        <input
+          type="file"
+          ref={calendarFileInputRef}
+          onChange={handleCalendarFileSelect}
+          accept=".json"
+          style={{ display: 'none' }}
+        />
+      </Box>
+
+      {/* Calendar Import Dialog */}
+      <Dialog open={calendarImportDialogOpen} onClose={() => setCalendarImportDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Import Calendar Events</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 2 }}>
+            Found {calendarImportData ? calendarImportData.length : 0} events in the file.
+          </Typography>
+          <FormControl component="fieldset">
+            <FormLabel component="legend">Import Mode</FormLabel>
+            <RadioGroup
+              value={calendarImportMode}
+              onChange={(e) => setCalendarImportMode(e.target.value)}
+            >
+              <FormControlLabel
+                value="merge"
+                control={<Radio />}
+                label="Merge - Add imported events alongside existing ones"
+              />
+              <FormControlLabel
+                value="replace"
+                control={<Radio />}
+                label="Replace - Delete all existing events and replace with file data"
+              />
+            </RadioGroup>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCalendarImportDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCalendarImportConfirm} variant="contained">
+            Import
           </Button>
         </DialogActions>
       </Dialog>
