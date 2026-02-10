@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -7,10 +7,8 @@ import {
   TextField,
   Button,
   Alert,
-  Link,
   Paper,
 } from '@mui/material';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
@@ -62,7 +60,7 @@ function Login() {
           >
             <Box
               component="img"
-              src="/logo.png"
+              src="/logo-2.jpg"
               alt="SH Underground"
               sx={{ width: 100, height: 100, mb: 2 }}
             />
@@ -115,9 +113,9 @@ function Login() {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
-              <Link component={RouterLink} to="/register" variant="body2">
-                Don't have an account? Sign Up
-              </Link>
+              <Typography variant="body2" color="text.secondary">
+                Need an account? Ask a member for an invite link.
+              </Typography>
             </Box>
           </Box>
         </Paper>

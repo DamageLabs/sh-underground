@@ -32,8 +32,8 @@ export function AuthProvider({ children }) {
     initAuth();
   }, []);
 
-  const register = async (username, password) => {
-    const userSession = await api.register(username, password);
+  const register = async (username, password, inviteToken) => {
+    const userSession = await api.register(username, password, inviteToken);
     userSession.isAdmin = ADMIN_USERS.includes(username);
     setUser(userSession);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession));

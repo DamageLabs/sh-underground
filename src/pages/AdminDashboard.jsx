@@ -28,6 +28,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
+import BlockIcon from '@mui/icons-material/Block';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api';
@@ -44,10 +45,14 @@ function AdminDashboard() {
   const [importMode, setImportMode] = useState('merge');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [invites, setInvites] = useState([]);
+  const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+  const [selectedInvite, setSelectedInvite] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadUsers();
+    loadInvites();
   }, []);
 
   const loadUsers = async () => {
@@ -57,6 +62,39 @@ function AdminDashboard() {
     } catch (err) {
       setError('Failed to load users');
     }
+  };
+
+  const loadInvites = async () => {
+    try {
+      const inviteList = await api.getAdminInvites();
+      setInvites(inviteList);
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleRevokeClick = (invite) => {
+    setSelectedInvite(invite);
+    setRevokeDialogOpen(true);
+    setError('');
+  };
+
+  const handleRevokeConfirm = async () => {
+    try {
+      await api.revokeInvite(selectedInvite.token);
+      await loadInvites();
+      setRevokeDialogOpen(false);
+      setSuccess('Invite token revoked');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const getInviteStatus = (invite) => {
+    if (invite.revoked) return { label: 'Revoked', color: 'error' };
+    if (invite.used_by) return { label: 'Used', color: 'default' };
+    return { label: 'Available', color: 'success' };
   };
 
   const handleEditClick = (userToEdit) => {
@@ -335,6 +373,82 @@ function AdminDashboard() {
           <Button onClick={() => setImportDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleImportConfirm} variant="contained">
             Import
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Invite Tokens Section */}
+      <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
+        Invite Tokens
+      </Typography>
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Token</TableCell>
+                <TableCell>Created By</TableCell>
+                <TableCell>Created At</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Used By</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {invites.map((invite) => {
+                const status = getInviteStatus(invite);
+                return (
+                  <TableRow key={invite.token}>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                        {invite.token.substring(0, 16)}...
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{invite.created_by}</TableCell>
+                    <TableCell>{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Chip label={status.label} color={status.color} size="small" />
+                    </TableCell>
+                    <TableCell>{invite.used_by || '-'}</TableCell>
+                    <TableCell align="right">
+                      {!invite.used_by && !invite.revoked && (
+                        <IconButton
+                          color="error"
+                          onClick={() => handleRevokeClick(invite)}
+                          size="small"
+                          title="Revoke"
+                        >
+                          <BlockIcon />
+                        </IconButton>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {invites.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    No invite tokens found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Revoke Dialog */}
+      <Dialog open={revokeDialogOpen} onClose={() => setRevokeDialogOpen(false)}>
+        <DialogTitle>Revoke Invite Token</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to revoke this invite token? It will no longer be usable for registration.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRevokeDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleRevokeConfirm} color="error" variant="contained">
+            Revoke
           </Button>
         </DialogActions>
       </Dialog>

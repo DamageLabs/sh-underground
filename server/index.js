@@ -90,10 +90,40 @@ if (!markerColumnNames.includes('profilePhoto')) {
   db.exec("ALTER TABLE users ADD COLUMN profilePhoto TEXT");
 }
 
+// Create invite_tokens table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS invite_tokens (
+    token TEXT PRIMARY KEY,
+    created_by TEXT NOT NULL,
+    used_by TEXT,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER,
+    revoked INTEGER DEFAULT 0
+  )
+`);
+
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
 app.use('/api/uploads', express.static(uploadsDir));
+
+// Auth middleware - checks x-username header for valid user
+const requireAuth = (req, res, next) => {
+  const username = req.headers['x-username'];
+
+  if (!username) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+
+  if (!user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+
+  req.user = user;
+  next();
+};
 
 // Admin middleware - checks x-username header for admin status
 const requireAdmin = (req, res, next) => {
@@ -140,10 +170,26 @@ const formatUserSession = (row) => ({
 
 // Register
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, inviteToken } = req.body;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  if (!inviteToken) {
+    return res.status(400).json({ error: 'Invite token required' });
+  }
+
+  // Validate invite token
+  const invite = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(inviteToken);
+  if (!invite) {
+    return res.status(400).json({ error: 'Invalid invite token' });
+  }
+  if (invite.used_by) {
+    return res.status(400).json({ error: 'Invite token has already been used' });
+  }
+  if (invite.revoked) {
+    return res.status(400).json({ error: 'Invite token has been revoked' });
   }
 
   const existing = db.prepare('SELECT username FROM users WHERE username = ?').get(username);
@@ -153,10 +199,28 @@ app.post('/api/register', async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-  db.prepare(`
-    INSERT INTO users (username, password, fullName, location, latitude, longitude, isAdmin)
-    VALUES (?, ?, '', NULL, NULL, NULL, 0)
-  `).run(username, hashedPassword);
+  // Use transaction to atomically create user + mark token used
+  const createUser = db.transaction(() => {
+    // Re-check token hasn't been used (race condition guard after async bcrypt)
+    const freshInvite = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(inviteToken);
+    if (freshInvite.used_by || freshInvite.revoked) {
+      throw new Error('Invite token is no longer available');
+    }
+
+    db.prepare(`
+      INSERT INTO users (username, password, fullName, location, latitude, longitude, isAdmin)
+      VALUES (?, ?, '', NULL, NULL, NULL, 0)
+    `).run(username, hashedPassword);
+
+    db.prepare('UPDATE invite_tokens SET used_by = ?, used_at = ? WHERE token = ?')
+      .run(username, Date.now(), inviteToken);
+  });
+
+  try {
+    createUser();
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
 
   res.json({
     username,
@@ -472,6 +536,41 @@ app.post('/api/admin/import', requireAdmin, async (req, res) => {
 
   const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
   res.json({ success: true, count });
+});
+
+// Generate invite token (any authenticated user)
+app.post('/api/invite', requireAuth, (req, res) => {
+  const token = crypto.randomBytes(32).toString('hex');
+  db.prepare('INSERT INTO invite_tokens (token, created_by, created_at) VALUES (?, ?, ?)')
+    .run(token, req.user.username, Date.now());
+  res.json({ token });
+});
+
+// Get current user's invite tokens
+app.get('/api/invites', requireAuth, (req, res) => {
+  const invites = db.prepare('SELECT * FROM invite_tokens WHERE created_by = ? ORDER BY created_at DESC')
+    .all(req.user.username);
+  res.json(invites);
+});
+
+// Admin: Get all invite tokens
+app.get('/api/admin/invites', requireAdmin, (req, res) => {
+  const invites = db.prepare('SELECT * FROM invite_tokens ORDER BY created_at DESC').all();
+  res.json(invites);
+});
+
+// Admin: Revoke invite token
+app.delete('/api/admin/invite/:token', requireAdmin, (req, res) => {
+  const { token } = req.params;
+  const invite = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(token);
+  if (!invite) {
+    return res.status(404).json({ error: 'Invite token not found' });
+  }
+  if (invite.used_by) {
+    return res.status(400).json({ error: 'Cannot revoke a used token' });
+  }
+  db.prepare('UPDATE invite_tokens SET revoked = 1 WHERE token = ?').run(token);
+  res.json({ success: true });
 });
 
 app.listen(PORT, () => {

@@ -15,11 +15,11 @@ const getAuthHeaders = () => {
 };
 
 export const api = {
-  async register(username, password) {
+  async register(username, password, inviteToken) {
     const res = await fetch(`${API_BASE}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, inviteToken }),
     });
     if (!res.ok) {
       const data = await res.json();
@@ -161,6 +161,52 @@ export const api = {
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error || 'Failed to delete photo');
+    }
+    return res.json();
+  },
+
+  async generateInvite() {
+    const res = await fetch(`${API_BASE}/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to generate invite');
+    }
+    return res.json();
+  },
+
+  async getMyInvites() {
+    const res = await fetch(`${API_BASE}/invites`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to get invites');
+    }
+    return res.json();
+  },
+
+  async getAdminInvites() {
+    const res = await fetch(`${API_BASE}/admin/invites`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to get invites');
+    }
+    return res.json();
+  },
+
+  async revokeInvite(token) {
+    const res = await fetch(`${API_BASE}/admin/invite/${token}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to revoke invite');
     }
     return res.json();
   },

@@ -15,6 +15,12 @@ import {
   MenuItem,
   Avatar,
   IconButton,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Tooltip,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import SaveIcon from '@mui/icons-material/Save';
@@ -23,6 +29,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
 
@@ -51,13 +59,59 @@ function Profile() {
   const [success, setSuccess] = useState('');
   const [geocodedResult, setGeocodedResult] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [invites, setInvites] = useState([]);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     api.getMarkerColors().then(setMarkerColors).catch(() => {
       setMarkerColors(['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'orange', 'ltblue']);
     });
+    loadInvites();
   }, []);
+
+  const loadInvites = async () => {
+    try {
+      const data = await api.getMyInvites();
+      setInvites(data);
+    } catch {
+      // silently fail
+    }
+  };
+
+  const getInviteLink = (token) => {
+    return `${window.location.origin}/register?invite=${token}`;
+  };
+
+  const handleGenerateInvite = async () => {
+    setGeneratingInvite(true);
+    try {
+      const { token } = await api.generateInvite();
+      const link = getInviteLink(token);
+      await navigator.clipboard.writeText(link);
+      setSuccess('Invite link generated and copied to clipboard!');
+      await loadInvites();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const handleCopyInvite = async (token) => {
+    try {
+      await navigator.clipboard.writeText(getInviteLink(token));
+      setSuccess('Invite link copied to clipboard!');
+    } catch {
+      setError('Failed to copy to clipboard');
+    }
+  };
+
+  const getInviteStatus = (invite) => {
+    if (invite.revoked) return { label: 'Revoked', color: 'error' };
+    if (invite.used_by) return { label: `Used by ${invite.used_by}`, color: 'default' };
+    return { label: 'Available', color: 'success' };
+  };
 
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -422,7 +476,7 @@ function Profile() {
       </Paper>
 
       {user?.location && (
-        <Paper sx={{ p: 3 }}>
+        <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <LocationOnIcon color="primary" />
             Current Saved Location
@@ -436,6 +490,57 @@ function Profile() {
           )}
         </Paper>
       )}
+
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <PersonAddIcon color="primary" />
+          Invite Friends
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Generate an invite link to share with someone you'd like to join SH Underground.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={handleGenerateInvite}
+          disabled={generatingInvite}
+          startIcon={<PersonAddIcon />}
+          sx={{ mb: 2 }}
+        >
+          {generatingInvite ? 'Generating...' : 'Generate Invite Link'}
+        </Button>
+
+        {invites.length > 0 && (
+          <List dense>
+            {invites.map((invite) => {
+              const status = getInviteStatus(invite);
+              return (
+                <ListItem key={invite.token} divider>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {invite.token.substring(0, 16)}...
+                        </Typography>
+                        <Chip label={status.label} color={status.color} size="small" />
+                      </Box>
+                    }
+                    secondary={new Date(invite.created_at).toLocaleDateString()}
+                  />
+                  <ListItemSecondaryAction>
+                    {!invite.used_by && !invite.revoked && (
+                      <Tooltip title="Copy invite link">
+                        <IconButton edge="end" size="small" onClick={() => handleCopyInvite(invite.token)}>
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </ListItemSecondaryAction>
+                </ListItem>
+              );
+            })}
+          </List>
+        )}
+      </Paper>
     </Box>
   );
 }
