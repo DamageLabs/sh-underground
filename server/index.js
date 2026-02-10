@@ -118,6 +118,13 @@ db.exec(`
   )
 `);
 
+// Migration: Add recurrence column to calendar_events if it doesn't exist
+const calCols = db.prepare("PRAGMA table_info(calendar_events)").all();
+const calColNames = calCols.map(c => c.name);
+if (!calColNames.includes('recurrence')) {
+  db.exec("ALTER TABLE calendar_events ADD COLUMN recurrence TEXT DEFAULT ''");
+}
+
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
@@ -607,8 +614,8 @@ app.post('/api/admin/events/import', requireAdmin, (req, res) => {
     db.prepare('DELETE FROM calendar_events').run();
   }
   const insert = db.prepare(
-    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, recurrence, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const tx = db.transaction(() => {
     for (const e of events) {
@@ -620,6 +627,7 @@ app.post('/api/admin/events/import', requireAdmin, (req, res) => {
         e.description || '',
         e.location || '',
         e.visibility || 'personal',
+        e.recurrence || '',
         e.created_by || req.adminUser.username,
         e.created_at || Date.now(),
         e.updated_at || Date.now()
@@ -663,6 +671,21 @@ app.get('/api/events/:id/ics', requireAuth, (req, res) => {
 
   const escText = (s) => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 
+  const veventLines = [
+    'BEGIN:VEVENT',
+    `UID:event-${event.id}@sh-underground`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;${dtStart}`,
+    `DTEND;${dtEnd}`,
+    `SUMMARY:${escText(event.title)}`,
+    `DESCRIPTION:${escText(event.description)}`,
+    `LOCATION:${escText(event.location)}`,
+  ];
+  if (event.recurrence) {
+    veventLines.push(`RRULE:${event.recurrence}`);
+  }
+  veventLines.push('END:VEVENT');
+
   const ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -686,15 +709,7 @@ app.get('/api/events/:id/ics', requireAuth, (req, res) => {
     'TZNAME:CDT',
     'END:DAYLIGHT',
     'END:VTIMEZONE',
-    'BEGIN:VEVENT',
-    `UID:event-${event.id}@sh-underground`,
-    `DTSTAMP:${stamp}`,
-    `DTSTART;${dtStart}`,
-    `DTEND;${dtEnd}`,
-    `SUMMARY:${escText(event.title)}`,
-    `DESCRIPTION:${escText(event.description)}`,
-    `LOCATION:${escText(event.location)}`,
-    'END:VEVENT',
+    ...veventLines,
     'END:VCALENDAR',
   ].join('\r\n');
 
@@ -735,7 +750,7 @@ app.get('/api/events/:id', requireAuth, (req, res) => {
 
 // Calendar Events: Create
 app.post('/api/events', requireAuth, (req, res) => {
-  const { title, event_date, event_time, description, location, visibility } = req.body;
+  const { title, event_date, event_time, description, location, visibility, recurrence } = req.body;
   if (!title || !event_date) {
     return res.status(400).json({ error: 'title and event_date are required' });
   }
@@ -744,8 +759,8 @@ app.post('/api/events', requireAuth, (req, res) => {
   }
   const now = Date.now();
   const result = db.prepare(
-    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, recurrence, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     title,
     event_date,
@@ -753,6 +768,7 @@ app.post('/api/events', requireAuth, (req, res) => {
     description || '',
     location || '',
     visibility || 'personal',
+    recurrence || '',
     req.user.username,
     now,
     now
@@ -770,12 +786,12 @@ app.put('/api/events/:id', requireAuth, (req, res) => {
   if (event.created_by !== req.user.username) {
     return res.status(403).json({ error: 'Only the event creator can edit' });
   }
-  const { title, event_date, event_time, description, location, visibility } = req.body;
+  const { title, event_date, event_time, description, location, visibility, recurrence } = req.body;
   if (visibility && !['community', 'personal'].includes(visibility)) {
     return res.status(400).json({ error: 'visibility must be community or personal' });
   }
   db.prepare(
-    `UPDATE calendar_events SET title = ?, event_date = ?, event_time = ?, description = ?, location = ?, visibility = ?, updated_at = ?
+    `UPDATE calendar_events SET title = ?, event_date = ?, event_time = ?, description = ?, location = ?, visibility = ?, recurrence = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     title !== undefined ? title : event.title,
@@ -784,6 +800,7 @@ app.put('/api/events/:id', requireAuth, (req, res) => {
     description !== undefined ? description : event.description,
     location !== undefined ? location : event.location,
     visibility !== undefined ? visibility : event.visibility,
+    recurrence !== undefined ? recurrence : event.recurrence,
     Date.now(),
     req.params.id
   );

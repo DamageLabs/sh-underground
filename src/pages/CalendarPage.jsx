@@ -13,14 +13,82 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import RepeatIcon from '@mui/icons-material/Repeat';
 import PersonIcon from '@mui/icons-material/Person';
 import { api } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const RECURRENCE_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'FREQ=WEEKLY', label: 'Weekly' },
+  { value: 'FREQ=BIWEEKLY', label: 'Every 2 weeks' },
+  { value: 'FREQ=MONTHLY', label: 'Monthly (same date)' },
+  { value: 'FREQ=MONTHLY;BYDAY=', label: 'Monthly (same weekday)' },
+  { value: 'FREQ=YEARLY', label: 'Yearly' },
+  { value: 'custom', label: 'Custom RRULE' },
+];
+
+const WEEKDAY_ABBRS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+function buildRecurrence(option, eventDate, untilDate, customRule) {
+  if (!option || option === '') return '';
+  if (option === 'custom') return customRule || '';
+  if (option === 'FREQ=BIWEEKLY') {
+    let rule = 'FREQ=WEEKLY;INTERVAL=2';
+    if (untilDate) rule += `;UNTIL=${untilDate.replace(/-/g, '')}T235959Z`;
+    return rule;
+  }
+  let rule = option;
+  if (option === 'FREQ=MONTHLY;BYDAY=' && eventDate) {
+    const d = new Date(eventDate + 'T00:00:00');
+    const weekday = WEEKDAY_ABBRS[d.getDay()];
+    const weekNum = Math.ceil(d.getDate() / 7);
+    rule = `FREQ=MONTHLY;BYDAY=${weekNum}${weekday}`;
+  }
+  if (untilDate) rule += `;UNTIL=${untilDate.replace(/-/g, '')}T235959Z`;
+  return rule;
+}
+
+function describeRecurrence(rrule) {
+  if (!rrule) return '';
+  const parts = {};
+  rrule.split(';').forEach(p => { const [k, v] = p.split('='); parts[k] = v; });
+  let desc = '';
+  if (parts.FREQ === 'WEEKLY' && parts.INTERVAL === '2') desc = 'Every 2 weeks';
+  else if (parts.FREQ === 'WEEKLY') desc = 'Weekly';
+  else if (parts.FREQ === 'MONTHLY' && parts.BYDAY) desc = `Monthly (${parts.BYDAY})`;
+  else if (parts.FREQ === 'MONTHLY') desc = 'Monthly';
+  else if (parts.FREQ === 'YEARLY') desc = 'Yearly';
+  else desc = rrule;
+  if (parts.UNTIL) {
+    const u = parts.UNTIL;
+    desc += ` until ${u.slice(0,4)}-${u.slice(4,6)}-${u.slice(6,8)}`;
+  }
+  if (parts.COUNT) desc += `, ${parts.COUNT} times`;
+  return desc;
+}
+
+function parseRecurrenceOption(rrule) {
+  if (!rrule) return '';
+  if (/^FREQ=WEEKLY;INTERVAL=2/.test(rrule)) return 'FREQ=BIWEEKLY';
+  if (/^FREQ=WEEKLY/.test(rrule)) return 'FREQ=WEEKLY';
+  if (/^FREQ=MONTHLY;BYDAY=/.test(rrule)) return 'FREQ=MONTHLY;BYDAY=';
+  if (/^FREQ=MONTHLY/.test(rrule)) return 'FREQ=MONTHLY';
+  if (/^FREQ=YEARLY/.test(rrule)) return 'FREQ=YEARLY';
+  return 'custom';
+}
+
+function parseUntilDate(rrule) {
+  if (!rrule) return '';
+  const match = rrule.match(/UNTIL=(\d{4})(\d{2})(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
+}
+
 const emptyForm = {
   title: '', event_date: '', event_time: '', description: '', location: '', visibility: 'community',
+  recurrenceOption: '', recurrenceUntil: '', recurrenceCustom: '',
 };
 
 function CalendarPage() {
@@ -101,6 +169,9 @@ function CalendarPage() {
       description: evt.description || '',
       location: evt.location || '',
       visibility: evt.visibility,
+      recurrenceOption: parseRecurrenceOption(evt.recurrence),
+      recurrenceUntil: parseUntilDate(evt.recurrence),
+      recurrenceCustom: parseRecurrenceOption(evt.recurrence) === 'custom' ? evt.recurrence : '',
     });
     setDialogOpen(true);
   };
@@ -111,11 +182,17 @@ function CalendarPage() {
 
   const handleSave = async () => {
     if (!form.title || !form.event_date) return;
+    const recurrence = buildRecurrence(form.recurrenceOption, form.event_date, form.recurrenceUntil, form.recurrenceCustom);
+    const payload = {
+      title: form.title, event_date: form.event_date, event_time: form.event_time,
+      description: form.description, location: form.location, visibility: form.visibility,
+      recurrence,
+    };
     try {
       if (editingEvent) {
-        await api.updateEvent(editingEvent.id, form);
+        await api.updateEvent(editingEvent.id, payload);
       } else {
-        await api.createEvent(form);
+        await api.createEvent(payload);
       }
       setDialogOpen(false);
       fetchEvents();
@@ -297,6 +374,12 @@ function CalendarPage() {
                   <PersonIcon sx={{ fontSize: 16 }} />
                   <Typography variant="body2">{evt.created_by}</Typography>
                 </Box>
+                {evt.recurrence && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <RepeatIcon sx={{ fontSize: 16 }} />
+                    <Typography variant="body2">{describeRecurrence(evt.recurrence)}</Typography>
+                  </Box>
+                )}
               </Box>
               {evt.description && (
                 <Typography variant="body2" component="div" sx={{ mt: 1, color: 'text.secondary', whiteSpace: 'pre-line' }}>
@@ -350,6 +433,30 @@ function CalendarPage() {
               <FormControlLabel value="personal" control={<Radio />} label="Personal" />
             </RadioGroup>
           </FormControl>
+          <TextField
+            label="Recurrence" select fullWidth value={form.recurrenceOption}
+            onChange={(e) => setForm({ ...form, recurrenceOption: e.target.value })}
+            SelectProps={{ native: true }}
+          >
+            {RECURRENCE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </TextField>
+          {form.recurrenceOption && form.recurrenceOption !== 'custom' && (
+            <TextField
+              label="Repeat until (optional)" type="date" fullWidth value={form.recurrenceUntil}
+              onChange={(e) => setForm({ ...form, recurrenceUntil: e.target.value })}
+              InputLabelProps={{ shrink: true }}
+            />
+          )}
+          {form.recurrenceOption === 'custom' && (
+            <TextField
+              label="Custom RRULE" fullWidth value={form.recurrenceCustom}
+              onChange={(e) => setForm({ ...form, recurrenceCustom: e.target.value })}
+              placeholder="e.g. FREQ=MONTHLY;BYDAY=2TU;UNTIL=20261208T235959Z"
+              helperText="Enter a valid iCalendar RRULE string"
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
