@@ -60,7 +60,7 @@ function Layout() {
       <Toolbar sx={{ gap: 1 }}>
         <Box
           component="img"
-          src="/logo.png"
+          src="/logo-2.jpg"
           alt="SH Underground"
           sx={{ width: 40, height: 40 }}
         />

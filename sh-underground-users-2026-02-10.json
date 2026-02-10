@@ -1,0 +1,275 @@
+{
+  "guntharp": {
+    "username": "guntharp",
+    "password": "$2b$10$LV9KitRSQlGSdj2qxONZ2uJZ7L3krztllL3oOW2yX7/E1BX060EbO",
+    "fullName": "Tony Guntharp",
+    "location": "Bandera, TX 78003, USA",
+    "coordinates": {
+      "lat": 29.7266131,
+      "lng": -99.0736462
+    },
+    "isAdmin": true,
+    "markerColor": "green",
+    "profilePhoto": "/uploads/guntharp-1769639545668.jpg"
+  },
+  "Alex Bush": {
+    "username": "Alex Bush",
+    "password": "$2b$10$S1kjUe0RFsXJF6gg8vi9iu6R/b/Ro22fBn3.ECLfr6nG.n42m4Kcy",
+    "fullName": "Alex Bush",
+    "location": "5 Buoy Dr, Mt Laurel Township, NJ 08054, USA",
+    "coordinates": {
+      "lat": 39.9951277,
+      "lng": -74.8801299
+    },
+    "isAdmin": false,
+    "markerColor": "orange",
+    "profilePhoto": "/uploads/Alex Bush-1769640801716.jpeg"
+  },
+  "Jon (Frenchie)": {
+    "username": "Jon (Frenchie)",
+    "password": "$2b$10$Z8r.O6pvAA/ILdD78OmXpOuyf2l5q/6yZ2SUl4pIUuL0VF4nfowVi",
+    "fullName": "",
+    "location": "Belleair, FL 33756, USA",
+    "coordinates": {
+      "lat": 27.9358543,
+      "lng": -82.8062139
+    },
+    "isAdmin": false,
+    "markerColor": "pink",
+    "profilePhoto": null
+  },
+  "justinkendall2008@gmail.com": {
+    "username": "justinkendall2008@gmail.com",
+    "password": "$2b$10$5gBLI65tJSsp/nOZfAetPejQyJeMTPuVzsvl4yAg8Hrs9TkqieFzq",
+    "fullName": "Justin Kendall",
+    "location": "Mechanicsville, VA, USA",
+    "coordinates": {
+      "lat": 37.6087561,
+      "lng": -77.3733139
+    },
+    "isAdmin": false,
+    "markerColor": "blue",
+    "profilePhoto": null
+  },
+  "mail@brainz.net": {
+    "username": "mail@brainz.net",
+    "password": "$2b$10$.5zorxVu8UWcoXp56dgUTe3n9k06G4xF3UMdVTRqt.pmGQeX8Yj8a",
+    "fullName": "Pradeep Nalluri",
+    "location": "Austin, TX, USA",
+    "coordinates": {
+      "lat": 30.267153,
+      "lng": -97.7430608
+    },
+    "isAdmin": false,
+    "markerColor": "red",
+    "profilePhoto": null
+  },
+  "LorenaSuarez-Kelly": {
+    "username": "LorenaSuarez-Kelly",
+    "password": "$2b$10$l0NijdY8MUKQ8DngHIr3Zuqpc7iSBMDz7NA2bp8wdh.JyzKVfhpQC",
+    "fullName": "Lorena Suarez-Kelly",
+    "location": "Summerlin, Las Vegas, NV, USA",
+    "coordinates": {
+      "lat": 36.1833989,
+      "lng": -115.3224069
+    },
+    "isAdmin": false,
+    "markerColor": "pink",
+    "profilePhoto": "/uploads/LorenaSuarez-Kelly-1769654021723.jpeg"
+  },
+  "Justinjmitchell": {
+    "username": "Justinjmitchell",
+    "password": "$2b$10$FBWQkDM0AldBIS1wkcM6tOhYEyJhbyy/WDkfpW3V5Vobq1TBzzhSq",
+    "fullName": "Justin Mitchell",
+    "location": "La Crosse, WI 54601, USA",
+    "coordinates": {
+      "lat": 43.8041647,
+      "lng": -91.15449629999999
+    },
+    "isAdmin": false,
+    "markerColor": "blue",
+    "profilePhoto": "/uploads/Justinjmitchell-1769693286639.jpeg"
+  },
+  "DavidGarras": {
+    "username": "DavidGarras",
+    "password": "$2b$10$k0.nQlhBh2QxeYgdaKjO4eyRNNzhhvKSRiVo/0NJ0ula8WPfgEmDm",
+    "fullName": "David Garras",
+    "location": "Naperville, IL, USA",
+    "coordinates": {
+      "lat": 41.7508391,
+      "lng": -88.1535352
+    },
+    "isAdmin": false,
+    "markerColor": "blue",
+    "profilePhoto": "/uploads/DavidGarras-1769749317755.jpeg"
+  },
+  "hdbrown3@gmail.com": {
+    "username": "hdbrown3@gmail.com",
+    "password": "$2b$10$dfrOCiws/fon3slz93TzGeuYUPETUOuSXpeBHewHvC7C3dtkAVX6q",
+    "fullName": "D Brown",
+    "location": "Hartsville, SC 29550, USA",
+    "coordinates": {
+      "lat": 34.3742857,
+      "lng": -80.07333129999999
+    },
+    "isAdmin": false,
+    "markerColor": "orange",
+    "profilePhoto": "/uploads/hdbrown3@gmail.com-1769955435466.jpeg"
+  },
+  "Ken Rothaermel": {
+    "username": "Ken Rothaermel",
+    "password": "$2b$10$5cBqOENumDcOlR7VGLVCaOxuNp1o0xN4iD9gB/NbpxehXkxNBoBTm",
+    "fullName": "Ken Rothaermel",
+    "location": "5605 6th St S, Arlington, VA 22204, USA",
+    "coordinates": {
+      "lat": 38.8611731,
+      "lng": -77.1243056
+    },
+    "isAdmin": false,
+    "markerColor": "blue",
+    "profilePhoto": null
+  },
+  "rradzwich@yahoo.com": {
+    "username": "rradzwich@yahoo.com",
+    "password": "$2b$10$V6syua3oNK8Nwuk5iTUZEeuskEm3KR//JpdjY0caolr/QDpZRPf1O",
+    "fullName": "Bob Radzwich",
+    "location": "State College, PA, USA",
+    "coordinates": {
+      "lat": 40.7933949,
+      "lng": -77.8600012
+    },
+    "isAdmin": false,
+    "markerColor": "green",
+    "profilePhoto": "/uploads/rradzwich@yahoo.com-1770575415635.jpeg"
+  },
+  "RoshanPai": {
+    "username": "RoshanPai",
+    "password": "$2b$10$iq.1DCtaz5bt.uTyejfDh.tC5e49ixasXEoM6VS8lwnUFMnzT.T/G",
+    "fullName": "",
+    "location": "2011 Kit Cir, Austin, TX 78758, USA",
+    "coordinates": {
+      "lat": 30.4059792,
+      "lng": -97.6868272
+    },
+    "isAdmin": false,
+    "markerColor": "red",
+    "profilePhoto": null
+  },
+  "HMPotter": {
+    "username": "HMPotter",
+    "password": "$2b$10$oTaIRXmkqweoEmbAJYSPFeRRiahHynCZBkvdUOKM0AxzOKGNqr2HC",
+    "fullName": "Heather Potter ",
+    "location": "New York, NY, USA",
+    "coordinates": {
+      "lat": 40.7127753,
+      "lng": -74.0059728
+    },
+    "isAdmin": false,
+    "markerColor": "green",
+    "profilePhoto": "/uploads/HMPotter-1770043461649.jpeg"
+  },
+  "pakara0306@gmail.com": {
+    "username": "pakara0306@gmail.com",
+    "password": "$2b$10$2i9SrfjEsSW65/v4zQPSr.oIn5VKAqetkutBO8tMg0ebIEIfuWNES",
+    "fullName": "Kara Miller",
+    "location": "Lakeland, FL, USA",
+    "coordinates": {
+      "lat": 28.042093,
+      "lng": -81.9534956
+    },
+    "isAdmin": false,
+    "markerColor": "purple",
+    "profilePhoto": null
+  },
+  "Feras Sweis": {
+    "username": "Feras Sweis",
+    "password": "$2b$10$wuoH0lwAYuU6YnqDF./KQuODnJGsAoSRpE8hjOpI/4f5rK8QsGrRu",
+    "fullName": "Feras Sweis",
+    "location": "15221 Timber Ridge Ct, Orland Park, IL 60467, USA",
+    "coordinates": {
+      "lat": 41.61282689999999,
+      "lng": -87.9045553
+    },
+    "isAdmin": false,
+    "markerColor": "green",
+    "profilePhoto": null
+  },
+  "Mrs. B": {
+    "username": "Mrs. B",
+    "password": "$2b$10$6eH5gQULZTko.vIuv9m2P.thS8BCRj.S1uuxuXkgyphwmONPDK3Oa",
+    "fullName": "Dawn Stowers",
+    "location": "476 Shaw Rd, Harmony, NC 28634, USA",
+    "coordinates": {
+      "lat": 35.9273008,
+      "lng": -80.7695286
+    },
+    "isAdmin": false,
+    "markerColor": "red",
+    "profilePhoto": "/uploads/Mrs. B-1770226079095.jpeg"
+  },
+  "Fabes371@gmail.com": {
+    "username": "Fabes371@gmail.com",
+    "password": "$2b$10$FeewAVoe8Qy8S3Vjf.254uAeHURnYOpKiYU2LwK6ctCVCGJdTK5zW",
+    "fullName": "Kris",
+    "location": "7880 W Park Cir Way S, Franklin, WI 53132, USA",
+    "coordinates": {
+      "lat": 42.8680469,
+      "lng": -88.0136757
+    },
+    "isAdmin": false,
+    "markerColor": "purple",
+    "profilePhoto": null
+  },
+  "Pthomas": {
+    "username": "Pthomas",
+    "password": "$2b$10$tYYCSI58MW6pCnWYyFeCvuAFv2FAMsE9VbR1NW21O.0SaEcgv6NKm",
+    "fullName": "Phillip Thomas",
+    "location": "Duluth, MN, USA",
+    "coordinates": {
+      "lat": 46.7844571,
+      "lng": -92.1055411
+    },
+    "isAdmin": false,
+    "markerColor": "orange",
+    "profilePhoto": null
+  },
+  "HollyKay": {
+    "username": "HollyKay",
+    "password": "$2b$10$RBu4pIMcQjGdIjTP7Yxbiuo50gk29clhq8R6rbFWfSsvgFXAMACcK",
+    "fullName": "Holly Holzknecht",
+    "location": "Arlington, WA 98223, USA",
+    "coordinates": {
+      "lat": 48.19857930000001,
+      "lng": -122.1250016
+    },
+    "isAdmin": false,
+    "markerColor": "purple",
+    "profilePhoto": "/uploads/HollyKay-1770522315256.jpeg"
+  },
+  "Jonneale": {
+    "username": "Jonneale",
+    "password": "$2b$10$RG7KH8C6eJxy.hnh0A2QnOZ3j/8quPEwgNFqgYkzDgvYzxO6vqBli",
+    "fullName": "",
+    "location": "Glassboro, NJ 08028, USA",
+    "coordinates": {
+      "lat": 39.7017383,
+      "lng": -75.11951069999999
+    },
+    "isAdmin": false,
+    "markerColor": "red",
+    "profilePhoto": null
+  },
+  "GypsyDoc": {
+    "username": "GypsyDoc",
+    "password": "$2b$10$jb1udL68LLFklvq9eRViSOOaqEFyDhpg5cw6pM8LPCmR4hYepoLcu",
+    "fullName": "Mika M King",
+    "location": "Lafayette, LA 70503, USA",
+    "coordinates": {
+      "lat": 30.1716722,
+      "lng": -92.06161780000001
+    },
+    "isAdmin": false,
+    "markerColor": "purple",
+    "profilePhoto": null
+  }
+}
