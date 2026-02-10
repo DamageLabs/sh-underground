@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
+  Divider,
   Drawer,
   IconButton,
   List,
@@ -19,9 +20,11 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import MapIcon from '@mui/icons-material/Map';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { useAuth } from '../contexts/AuthContext';
+import MiniCalendar from './MiniCalendar';
 
 const drawerWidth = 240;
 
@@ -32,6 +35,7 @@ function Layout() {
   const menuItems = [
     { text: 'Profile', icon: <PersonIcon />, path: '/app/profile' },
     { text: 'Map View', icon: <MapIcon />, path: '/app/map' },
+    { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/app/calendar' },
     ...(isAdmin ? [{ text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/app/admin' }] : []),
   ];
   const navigate = useNavigate();
@@ -81,6 +85,8 @@ function Layout() {
           </ListItem>
         ))}
       </List>
+      <Divider />
+      <MiniCalendar />
     </Box>
   );
 

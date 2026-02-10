@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Profile from './pages/Profile';
 import MapView from './pages/MapView';
 import AdminDashboard from './pages/AdminDashboard';
+import CalendarPage from './pages/CalendarPage';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         <Route index element={<Navigate to="/app/profile" replace />} />
         <Route path="profile" element={<Profile />} />
         <Route path="map" element={<MapView />} />
+        <Route path="calendar" element={<CalendarPage />} />
         <Route path="admin" element={<AdminDashboard />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

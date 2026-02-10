@@ -102,6 +102,22 @@ db.exec(`
   )
 `);
 
+// Create calendar_events table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS calendar_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    event_date TEXT NOT NULL,
+    event_time TEXT,
+    description TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    visibility TEXT NOT NULL DEFAULT 'personal',
+    created_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`);
+
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
@@ -570,6 +586,106 @@ app.delete('/api/admin/invite/:token', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Cannot revoke a used token' });
   }
   db.prepare('UPDATE invite_tokens SET revoked = 1 WHERE token = ?').run(token);
+  res.json({ success: true });
+});
+
+// Calendar Events: List events for a month
+app.get('/api/events', requireAuth, (req, res) => {
+  const { month } = req.query; // YYYY-MM
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month query param required in YYYY-MM format' });
+  }
+  const startDate = `${month}-01`;
+  const endDate = `${month}-31`;
+  const events = db.prepare(
+    `SELECT * FROM calendar_events
+     WHERE event_date >= ? AND event_date <= ?
+       AND (visibility = 'community' OR created_by = ?)
+     ORDER BY event_date, event_time`
+  ).all(startDate, endDate, req.user.username);
+  res.json(events);
+});
+
+// Calendar Events: Get single event
+app.get('/api/events/:id', requireAuth, (req, res) => {
+  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  if (event.visibility === 'personal' && event.created_by !== req.user.username) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  res.json(event);
+});
+
+// Calendar Events: Create
+app.post('/api/events', requireAuth, (req, res) => {
+  const { title, event_date, event_time, description, location, visibility } = req.body;
+  if (!title || !event_date) {
+    return res.status(400).json({ error: 'title and event_date are required' });
+  }
+  if (visibility && !['community', 'personal'].includes(visibility)) {
+    return res.status(400).json({ error: 'visibility must be community or personal' });
+  }
+  const now = Date.now();
+  const result = db.prepare(
+    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    title,
+    event_date,
+    event_time || null,
+    description || '',
+    location || '',
+    visibility || 'personal',
+    req.user.username,
+    now,
+    now
+  );
+  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(result.lastInsertRowid);
+  res.json(event);
+});
+
+// Calendar Events: Update
+app.put('/api/events/:id', requireAuth, (req, res) => {
+  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  if (event.created_by !== req.user.username) {
+    return res.status(403).json({ error: 'Only the event creator can edit' });
+  }
+  const { title, event_date, event_time, description, location, visibility } = req.body;
+  if (visibility && !['community', 'personal'].includes(visibility)) {
+    return res.status(400).json({ error: 'visibility must be community or personal' });
+  }
+  db.prepare(
+    `UPDATE calendar_events SET title = ?, event_date = ?, event_time = ?, description = ?, location = ?, visibility = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(
+    title !== undefined ? title : event.title,
+    event_date !== undefined ? event_date : event.event_date,
+    event_time !== undefined ? (event_time || null) : event.event_time,
+    description !== undefined ? description : event.description,
+    location !== undefined ? location : event.location,
+    visibility !== undefined ? visibility : event.visibility,
+    Date.now(),
+    req.params.id
+  );
+  const updated = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  res.json(updated);
+});
+
+// Calendar Events: Delete
+app.delete('/api/events/:id', requireAuth, (req, res) => {
+  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  if (!event) {
+    return res.status(404).json({ error: 'Event not found' });
+  }
+  if (event.created_by !== req.user.username && !req.user.isAdmin) {
+    return res.status(403).json({ error: 'Only the creator or admin can delete' });
+  }
+  db.prepare('DELETE FROM calendar_events WHERE id = ?').run(req.params.id);
   res.json({ success: true });
 });
 

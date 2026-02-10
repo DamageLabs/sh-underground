@@ -210,4 +210,64 @@ export const api = {
     }
     return res.json();
   },
+
+  async getEvents(month) {
+    const res = await fetch(`${API_BASE}/events?month=${month}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to get events');
+    }
+    return res.json();
+  },
+
+  async getEvent(id) {
+    const res = await fetch(`${API_BASE}/events/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to get event');
+    }
+    return res.json();
+  },
+
+  async createEvent(eventData) {
+    const res = await fetch(`${API_BASE}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(eventData),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to create event');
+    }
+    return res.json();
+  },
+
+  async updateEvent(id, eventData) {
+    const res = await fetch(`${API_BASE}/events/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(eventData),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to update event');
+    }
+    return res.json();
+  },
+
+  async deleteEvent(id) {
+    const res = await fetch(`${API_BASE}/events/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to delete event');
+    }
+    return res.json();
+  },
 };
