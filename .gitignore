@@ -30,7 +30,12 @@ Thumbs.db
 # Claude
 .claude/
 
-# Sensitive data
+# Sensitive data / user data
 server/data/users.json
 server/data/users.db
 server/uploads/
+*-users-*.json
+users-export.json
+
+# Server dependencies
+server/node_modules/
