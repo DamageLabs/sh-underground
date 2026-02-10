@@ -53,7 +53,7 @@ function MapView() {
             <Button
               color="inherit"
               size="small"
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate('/app/profile')}
               startIcon={<EditLocationIcon />}
             >
               Set Location
@@ -89,7 +89,7 @@ function MapView() {
           <Box sx={{ mt: 2, textAlign: 'center' }}>
             <Button
               variant="outlined"
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate('/app/profile')}
               startIcon={<EditLocationIcon />}
             >
               Change Location

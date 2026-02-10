@@ -30,9 +30,9 @@ function Layout() {
   const { user, logout, isAdmin } = useAuth();
 
   const menuItems = [
-    { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
-    { text: 'Map View', icon: <MapIcon />, path: '/map' },
-    ...(isAdmin ? [{ text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/admin' }] : []),
+    { text: 'Profile', icon: <PersonIcon />, path: '/app/profile' },
+    { text: 'Map View', icon: <MapIcon />, path: '/app/map' },
+    ...(isAdmin ? [{ text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/app/admin' }] : []),
   ];
   const navigate = useNavigate();
   const location = useLocation();

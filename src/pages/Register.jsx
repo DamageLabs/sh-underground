@@ -50,7 +50,7 @@ function Register() {
     setLoading(true);
     try {
       await register(username, password, inviteToken);
-      navigate('/profile');
+      navigate('/app/profile');
     } catch (err) {
       setError(err.message);
     } finally {

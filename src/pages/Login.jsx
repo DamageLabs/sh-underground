@@ -31,7 +31,7 @@ function Login() {
     setLoading(true);
     try {
       await login(username, password);
-      navigate('/profile');
+      navigate('/app/profile');
     } catch (err) {
       setError(err.message);
     } finally {

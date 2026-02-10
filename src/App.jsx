@@ -15,15 +15,17 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route
+        path="/app"
         element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
         }
       >
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/map" element={<MapView />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route index element={<Navigate to="/app/profile" replace />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="map" element={<MapView />} />
+        <Route path="admin" element={<AdminDashboard />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

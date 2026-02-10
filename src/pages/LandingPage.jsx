@@ -15,7 +15,7 @@ function LandingPage() {
   const navigate = useNavigate();
 
   if (isAuthenticated) {
-    return <Navigate to="/profile" replace />;
+    return <Navigate to="/app/profile" replace />;
   }
 
   return (
