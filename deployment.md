@@ -1,204 +1,175 @@
-# Deploying SH Underground to GCP VM
+# SH Underground — Production Deployment Guide
 
-## 1. Create a GCP VM Instance
+This guide covers deploying SH Underground on the DamageLabs GCP VM.
 
-```bash
-# Using gcloud CLI
-gcloud compute instances create sh-underground \
-  --zone=us-central1-a \
-  --machine-type=e2-micro \
-  --image-family=ubuntu-2204-lts \
-  --image-project=ubuntu-os-cloud \
-  --tags=http-server,https-server
-```
+## Production Details
 
-Or create via GCP Console: Compute Engine → VM Instances → Create Instance
+| Setting | Value |
+|---------|-------|
+| Domain | sh-underground.com |
+| Port | 3002 |
+| Directory | `/var/www/sh-underground.com` |
+| User | `fusion94` |
+| Process Manager | systemd (`sh-underground.service`) |
+| Database | SQLite (`server/data/sh-underground.db`) |
+| Node Binary | `/usr/local/bin/node` |
 
-## 2. Configure Firewall Rules
+---
 
-```bash
-# Allow HTTP traffic
-gcloud compute firewall-rules create allow-http \
-  --allow tcp:80 \
-  --target-tags=http-server
+## Deploy Application
 
-# Allow HTTPS traffic
-gcloud compute firewall-rules create allow-https \
-  --allow tcp:443 \
-  --target-tags=https-server
-```
-
-## 3. SSH into the VM
-
-```bash
-gcloud compute ssh sh-underground --zone=us-central1-a
-```
-
-## 4. Install Dependencies on VM
-
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# Install nginx
-sudo apt install -y nginx
-
-# Verify installations
-node --version
-npm --version
-nginx -v
-```
-
-## 5. Deploy Application
-
-### Option A: Clone from Git
+### Initial Deploy
 
 ```bash
 cd /var/www
-sudo git clone <your-repo-url> sh-underground
-cd sh-underground
-sudo chown -R $USER:$USER .
-```
+sudo git clone https://github.com/DamageLabs/sh-underground.git sh-underground.com
+sudo chown -R fusion94:fusion94 sh-underground.com
+cd sh-underground.com
 
-### Option B: Upload files via SCP
-
-From your local machine:
-```bash
-# Build locally first
-npm run build
-
-# Upload dist folder
-gcloud compute scp --recurse ./dist sh-underground:/tmp/dist --zone=us-central1-a
-```
-
-On the VM:
-```bash
-sudo mkdir -p /var/www/sh-underground
-sudo mv /tmp/dist/* /var/www/sh-underground/
-```
-
-### If building on the VM:
-
-```bash
-cd /var/www/sh-underground
-
-# Create .env file
-sudo nano .env
-# Add: VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
-
-# Install dependencies and build
+# Install frontend dependencies and build
 npm install
 npm run build
 
-# Move build output to serve directory
-sudo mkdir -p /var/www/html/sh-underground
-sudo cp -r dist/* /var/www/html/sh-underground/
+# Install server dependencies
+cd server
+npm install
+cd ..
 ```
 
-## 6. Configure Nginx
+### Update Deploy
 
 ```bash
-sudo nano /etc/nginx/sites-available/sh-underground
+cd /var/www/sh-underground.com
+git pull origin main
+npm install
+npm run build
+cd server && npm install && cd ..
+sudo systemctl restart sh-underground
 ```
 
-Add the following configuration:
+---
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;  # Or use VM's external IP
-    root /var/www/html/sh-underground;
-    index index.html;
-
-    # Gzip compression
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
-
-    # Handle SPA routing
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-Enable the site:
+## Configure Environment
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/sh-underground /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default  # Remove default site
-sudo nginx -t  # Test configuration
-sudo systemctl restart nginx
+cat > /var/www/sh-underground.com/.env << 'EOF'
+VITE_GOOGLE_MAPS_API_KEY=<your-key>
+EOF
+
+chmod 600 /var/www/sh-underground.com/.env
 ```
 
-## 7. Set Up SSL with Let's Encrypt (Optional but Recommended)
+---
+
+## systemd Service
+
+### Create the Service
 
 ```bash
-# Install Certbot
-sudo apt install -y certbot python3-certbot-nginx
+sudo tee /etc/systemd/system/sh-underground.service > /dev/null << 'EOF'
+[Unit]
+Description=SH Underground (sh-underground.com)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
-# Obtain certificate (replace with your domain)
-sudo certbot --nginx -d your-domain.com
+[Service]
+Type=simple
+User=fusion94
+Group=fusion94
+WorkingDirectory=/var/www/sh-underground.com
+ExecStart=/usr/local/bin/node server/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+Environment=PORT=3002
 
-# Auto-renewal is configured automatically
-# Test renewal with:
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+### Enable and Start
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable sh-underground
+sudo systemctl start sh-underground
+```
+
+### Common Commands
+
+```bash
+sudo systemctl status sh-underground      # Check status
+sudo systemctl restart sh-underground     # Restart
+sudo systemctl stop sh-underground        # Stop
+sudo journalctl -u sh-underground -f      # Follow logs
+sudo journalctl -u sh-underground -n 50   # Last 50 lines
+```
+
+---
+
+## Nginx Configuration
+
+The Nginx config is version-controlled in `DamageLabs/brain` at `infra/nginx/sites-available/sh-underground`.
+
+Key points:
+- Frontend static files served from `/var/www/sh-underground.com/dist`
+- API requests proxied to `localhost:3002`
+- Upload requests proxied to `localhost:3002`
+- Shared snippets: `security-headers.conf`, `static-cache.conf`
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/sh-underground /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+---
+
+## SSL with Let's Encrypt
+
+```bash
+sudo certbot --nginx -d sh-underground.com -d www.sh-underground.com \
+  --non-interactive --agree-tos -m fusion94@gmail.com
+```
+
+Auto-renewal test:
+```bash
 sudo certbot renew --dry-run
 ```
 
-## 8. Verify Deployment
+---
 
-Visit your VM's external IP or domain in a browser:
-- http://YOUR_EXTERNAL_IP
-- https://your-domain.com (if SSL configured)
+## Maintenance
 
-Find external IP:
-```bash
-gcloud compute instances describe sh-underground \
-  --zone=us-central1-a \
-  --format='get(networkInterfaces[0].accessConfigs[0].natIP)'
-```
-
-## Updating the Application
+### Database Backup
 
 ```bash
-# SSH into VM
-gcloud compute ssh sh-underground --zone=us-central1-a
-
-# If using git
-cd /var/www/sh-underground
-git pull
-npm install
-npm run build
-sudo cp -r dist/* /var/www/html/sh-underground/
-sudo systemctl restart nginx
+cp /var/www/sh-underground.com/server/data/sh-underground.db ~/backups/sh-underground-$(date +%Y%m%d-%H%M%S).db
 ```
 
-Or rebuild locally and re-upload via SCP.
+### View Logs
+
+```bash
+sudo journalctl -u sh-underground -f
+sudo tail -f /var/log/nginx/access.log
+```
+
+---
 
 ## Troubleshooting
 
-```bash
-# Check nginx status
-sudo systemctl status nginx
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Exit code 203 | Node binary not accessible | Verify `/usr/local/bin/node` exists |
+| Port conflict | Another process on 3002 | `sudo ss -tlnp \| grep :3002` |
+| 502 Bad Gateway | Service not running | `sudo systemctl start sh-underground` |
 
-# View nginx error logs
-sudo tail -f /var/log/nginx/error.log
+---
 
-# View nginx access logs
-sudo tail -f /var/log/nginx/access.log
-
-# Test nginx configuration
-sudo nginx -t
-
-# Restart nginx
-sudo systemctl restart nginx
-```
+*Last updated: March 17, 2026*
