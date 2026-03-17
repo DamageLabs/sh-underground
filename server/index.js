@@ -821,6 +821,27 @@ app.delete('/api/events/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// Health check
+app.get('/api/health', (req, res) => {
+  let dbStatus = 'ok';
+  try {
+    db.prepare('SELECT 1').get();
+  } catch {
+    dbStatus = 'error';
+  }
+
+  const status = dbStatus === 'ok' ? 'ok' : 'degraded';
+  res.status(status === 'ok' ? 200 : 503).json({
+    status,
+    service: 'sh-underground',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    checks: {
+      database: dbStatus,
+    },
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`SH Underground API running on port ${PORT}`);
 });
