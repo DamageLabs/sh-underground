@@ -87,7 +87,7 @@ function parseUntilDate(rrule) {
 }
 
 const emptyForm = {
-  title: '', event_date: '', event_time: '', description: '', location: '', visibility: 'community',
+  title: '', event_date: '', end_date: '', event_time: '', description: '', location: '', visibility: 'community',
   recurrenceOption: '', recurrenceUntil: '', recurrenceCustom: '',
 };
 
@@ -148,11 +148,21 @@ function CalendarPage() {
   const eventsForDay = (d) => {
     if (!d) return [];
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    return events.filter((e) => e.event_date === dateStr);
+    return events.filter((e) => {
+      if (e.end_date) {
+        return dateStr >= e.event_date && dateStr <= e.end_date;
+      }
+      return e.event_date === dateStr;
+    });
   };
 
   const selectedDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
-  const selectedEvents = events.filter((e) => e.event_date === selectedDateStr);
+  const selectedEvents = events.filter((e) => {
+    if (e.end_date) {
+      return selectedDateStr >= e.event_date && selectedDateStr <= e.end_date;
+    }
+    return e.event_date === selectedDateStr;
+  });
   const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
 
   const openCreate = () => {
@@ -165,6 +175,7 @@ function CalendarPage() {
     setForm({
       title: evt.title,
       event_date: evt.event_date,
+      end_date: evt.end_date || '',
       event_time: evt.event_time || '',
       description: evt.description || '',
       location: evt.location || '',
@@ -184,7 +195,8 @@ function CalendarPage() {
     if (!form.title || !form.event_date) return;
     const recurrence = buildRecurrence(form.recurrenceOption, form.event_date, form.recurrenceUntil, form.recurrenceCustom);
     const payload = {
-      title: form.title, event_date: form.event_date, event_time: form.event_time,
+      title: form.title, event_date: form.event_date, end_date: form.end_date || '',
+      event_time: form.event_time,
       description: form.description, location: form.location, visibility: form.visibility,
       recurrence,
     };
@@ -431,9 +443,15 @@ function CalendarPage() {
             onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
           <TextField
-            label="Date" type="date" required fullWidth value={form.event_date}
+            label="Start Date" type="date" required fullWidth value={form.event_date}
             onChange={(e) => setForm({ ...form, event_date: e.target.value })}
             InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="End Date (optional, for multi-day events)" type="date" fullWidth value={form.end_date}
+            onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+            InputLabelProps={{ shrink: true }}
+            inputProps={{ min: form.event_date }}
           />
           <TextField
             label="Time (optional)" type="time" fullWidth value={form.event_time}
