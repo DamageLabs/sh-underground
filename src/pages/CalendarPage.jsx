@@ -359,6 +359,12 @@ function CalendarPage() {
         </Typography>
         <IconButton onClick={nextMonth}><ChevronRightIcon /></IconButton>
         <Box sx={{ flexGrow: 1 }} />
+        <Button variant="outlined" onClick={() => {
+          const url = `webcal://${window.location.host}/api/calendar/subscribe`;
+          window.open(url);
+        }} sx={{ mr: 1 }}>
+          📅 Subscribe
+        </Button>
         <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCalendar} sx={{ mr: 1 }}>
           Export .ics
         </Button>
