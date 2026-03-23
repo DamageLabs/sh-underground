@@ -614,6 +614,88 @@ app.get('/api/admin/events/export', requireAdmin, (req, res) => {
 });
 
 // Export full calendar as ICS
+// Public community calendar subscription (no auth - for webcal:// subscribe)
+app.get('/api/calendar/subscribe', (req, res) => {
+  const events = db.prepare(
+    `SELECT * FROM calendar_events WHERE visibility = 'community' ORDER BY event_date, event_time`
+  ).all();
+
+  const usersWithBirthdays = db.prepare(
+    `SELECT username, fullName, birthday FROM users WHERE birthday != '' AND birthday IS NOT NULL`
+  ).all();
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+  const escText = (s) => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+  const vevents = events.map(event => {
+    const [yr, mo, dy] = event.event_date.split('-');
+    let dtStart, dtEnd;
+    if (event.end_date) {
+      dtStart = `VALUE=DATE:${yr}${mo}${dy}`;
+      const [eyr, emo, edy] = event.end_date.split('-');
+      const nextDay = new Date(parseInt(eyr), parseInt(emo) - 1, parseInt(edy) + 1);
+      dtEnd = `VALUE=DATE:${nextDay.getFullYear()}${pad(nextDay.getMonth() + 1)}${pad(nextDay.getDate())}`;
+    } else if (event.event_time) {
+      const [hh, mm] = event.event_time.split(':');
+      dtStart = `TZID=America/Chicago:${yr}${mo}${dy}T${pad(hh)}${pad(mm)}00`;
+      const endH = (parseInt(hh, 10) + 1) % 24;
+      dtEnd = `TZID=America/Chicago:${yr}${mo}${dy}T${pad(endH)}${pad(mm)}00`;
+    } else {
+      dtStart = `VALUE=DATE:${yr}${mo}${dy}`;
+      const nextDay = new Date(parseInt(yr), parseInt(mo) - 1, parseInt(dy) + 1);
+      dtEnd = `VALUE=DATE:${nextDay.getFullYear()}${pad(nextDay.getMonth() + 1)}${pad(nextDay.getDate())}`;
+    }
+    const lines = [
+      'BEGIN:VEVENT',
+      `UID:event-${event.id}@sh-underground`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;${dtStart}`,
+      `DTEND;${dtEnd}`,
+      `SUMMARY:${escText(event.title)}`,
+      `DESCRIPTION:${escText(event.description)}`,
+      `LOCATION:${escText(event.location)}`,
+    ];
+    if (event.recurrence) lines.push(`RRULE:${event.recurrence}`);
+    lines.push('END:VEVENT');
+    return lines.join('\r\n');
+  });
+
+  const thisYear = now.getFullYear();
+  const birthdayVevents = usersWithBirthdays.map(u => {
+    const [, bmo, bdy] = u.birthday.split('-');
+    return [
+      'BEGIN:VEVENT',
+      `UID:birthday-${u.username}@sh-underground`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${thisYear}${bmo}${bdy}`,
+      `DTEND;VALUE=DATE:${thisYear}${bmo}${String(parseInt(bdy) + 1).padStart(2, '0')}`,
+      `SUMMARY:🎂 ${escText((u.fullName || u.username) + "'s Birthday")}`,
+      'RRULE:FREQ=YEARLY',
+      'END:VEVENT'
+    ].join('\r\n');
+  });
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//SH Underground//Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:SH Underground Community',
+    'X-WR-TIMEZONE:America/Chicago',
+    `REFRESH-INTERVAL;VALUE=DURATION:PT1H`,
+    ...vevents,
+    ...birthdayVevents,
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.send(ics);
+});
+
+// Authenticated full calendar export (download)
 app.get('/api/events/export/ics', requireAuth, (req, res) => {
   const events = db.prepare(
     `SELECT * FROM calendar_events
