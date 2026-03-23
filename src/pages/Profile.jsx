@@ -48,6 +48,7 @@ const MARKER_COLOR_LABELS = {
 function Profile() {
   const { user, updateLocation, updateProfile, changePassword, refreshUser } = useAuth();
   const [fullName, setFullName] = useState(user?.fullName || '');
+  const [birthday, setBirthday] = useState(user?.birthday || '');
   const [markerColor, setMarkerColor] = useState(user?.markerColor || 'red');
   const [markerColors, setMarkerColors] = useState([]);
   const [locationInput, setLocationInput] = useState(user?.location || '');
@@ -153,7 +154,7 @@ function Profile() {
 
   const handleSaveProfile = async () => {
     try {
-      await updateProfile({ fullName, markerColor });
+      await updateProfile({ fullName, markerColor, birthday });
       setSuccess('Profile saved successfully!');
     } catch (err) {
       setError(err.message);
@@ -350,6 +351,14 @@ function Profile() {
             placeholder="Enter your full name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+          />
+          <TextField
+            sx={{ minWidth: 180 }}
+            label="Birthday"
+            type="date"
+            value={birthday}
+            onChange={(e) => setBirthday(e.target.value)}
+            InputLabelProps={{ shrink: true }}
           />
           <FormControl sx={{ minWidth: 150 }}>
             <InputLabel>Marker Icon</InputLabel>

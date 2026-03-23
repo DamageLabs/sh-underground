@@ -74,6 +74,9 @@ if (!columnNames.includes('resetToken')) {
 if (!columnNames.includes('resetTokenExpires')) {
   db.exec('ALTER TABLE users ADD COLUMN resetTokenExpires INTEGER');
 }
+if (!columnNames.includes('birthday')) {
+  db.exec("ALTER TABLE users ADD COLUMN birthday TEXT DEFAULT ''");
+}
 
 const RESET_TOKEN_EXPIRY_HOURS = 24;
 
@@ -179,6 +182,7 @@ const formatUser = (row) => ({
   isAdmin: !!row.isAdmin,
   markerColor: row.markerColor || 'red',
   profilePhoto: row.profilePhoto || null,
+  birthday: row.birthday || '',
 });
 
 const formatUserSession = (row) => ({
@@ -189,6 +193,7 @@ const formatUserSession = (row) => ({
   isAdmin: !!row.isAdmin,
   markerColor: row.markerColor || 'red',
   profilePhoto: row.profilePhoto || null,
+  birthday: row.birthday || '',
 });
 
 // Register
@@ -290,7 +295,7 @@ app.get('/api/user/:username', (req, res) => {
 // Update user profile
 app.put('/api/user/:username', (req, res) => {
   const { username } = req.params;
-  const { fullName, location, coordinates, markerColor } = req.body;
+  const { fullName, location, coordinates, markerColor, birthday } = req.body;
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 
@@ -307,12 +312,13 @@ app.put('/api/user/:username', (req, res) => {
     latitude: coordinates?.lat !== undefined ? coordinates.lat : user.latitude,
     longitude: coordinates?.lng !== undefined ? coordinates.lng : user.longitude,
     markerColor: validMarkerColor || 'red',
+    birthday: birthday !== undefined ? birthday : (user.birthday || ''),
   };
 
   db.prepare(`
-    UPDATE users SET fullName = ?, location = ?, latitude = ?, longitude = ?, markerColor = ?
+    UPDATE users SET fullName = ?, location = ?, latitude = ?, longitude = ?, markerColor = ?, birthday = ?
     WHERE username = ?
-  `).run(updates.fullName, updates.location, updates.latitude, updates.longitude, updates.markerColor, username);
+  `).run(updates.fullName, updates.location, updates.latitude, updates.longitude, updates.markerColor, updates.birthday, username);
 
   const updated = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   res.json(formatUserSession(updated));
@@ -604,6 +610,86 @@ app.get('/api/admin/events/export', requireAdmin, (req, res) => {
   res.json(events);
 });
 
+// Export full calendar as ICS
+app.get('/api/events/export/ics', requireAuth, (req, res) => {
+  const events = db.prepare(
+    `SELECT * FROM calendar_events
+     WHERE visibility = 'community' OR created_by = ?
+     ORDER BY event_date, event_time`
+  ).all(req.user.username);
+
+  // Also include birthdays
+  const usersWithBirthdays = db.prepare(
+    `SELECT username, fullName, birthday FROM users WHERE birthday != '' AND birthday IS NOT NULL`
+  ).all();
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+  const escText = (s) => (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+  const vevents = events.map(event => {
+    const [yr, mo, dy] = event.event_date.split('-');
+    let dtStart, dtEnd;
+    if (event.event_time) {
+      const [hh, mm] = event.event_time.split(':');
+      dtStart = `TZID=America/Chicago:${yr}${mo}${dy}T${pad(hh)}${pad(mm)}00`;
+      const endH = (parseInt(hh, 10) + 1) % 24;
+      dtEnd = `TZID=America/Chicago:${yr}${mo}${dy}T${pad(endH)}${pad(mm)}00`;
+    } else {
+      dtStart = `VALUE=DATE:${yr}${mo}${dy}`;
+      const nextDay = new Date(parseInt(yr), parseInt(mo) - 1, parseInt(dy) + 1);
+      dtEnd = `VALUE=DATE:${nextDay.getFullYear()}${pad(nextDay.getMonth() + 1)}${pad(nextDay.getDate())}`;
+    }
+
+    const lines = [
+      'BEGIN:VEVENT',
+      `UID:event-${event.id}@sh-underground`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;${dtStart}`,
+      `DTEND;${dtEnd}`,
+      `SUMMARY:${escText(event.title)}`,
+      `DESCRIPTION:${escText(event.description)}`,
+      `LOCATION:${escText(event.location)}`,
+    ];
+    if (event.recurrence) lines.push(`RRULE:${event.recurrence}`);
+    lines.push('END:VEVENT');
+    return lines.join('\r\n');
+  });
+
+  // Add birthday events
+  const thisYear = now.getFullYear();
+  const birthdayVevents = usersWithBirthdays.map(u => {
+    const [, bmo, bdy] = u.birthday.split('-');
+    return [
+      'BEGIN:VEVENT',
+      `UID:birthday-${u.username}@sh-underground`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${thisYear}${bmo}${bdy}`,
+      `DTEND;VALUE=DATE:${thisYear}${bmo}${String(parseInt(bdy) + 1).padStart(2, '0')}`,
+      `SUMMARY:🎂 ${escText((u.fullName || u.username) + "'s Birthday")}`,
+      'RRULE:FREQ=YEARLY',
+      'END:VEVENT'
+    ].join('\r\n');
+  });
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//SH Underground//Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:SH Underground',
+    ...vevents,
+    ...birthdayVevents,
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename=sh-underground-calendar.ics');
+  res.send(ics);
+});
+
 // Admin: Import calendar events
 app.post('/api/admin/events/import', requireAdmin, (req, res) => {
   const { events, mode } = req.body;
@@ -641,7 +727,38 @@ app.post('/api/admin/events/import', requireAdmin, (req, res) => {
 
 // Calendar Events: Download single event as .ics
 app.get('/api/events/:id/ics', requireAuth, (req, res) => {
-  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  const eventId = req.params.id;
+  
+  // Handle birthday events (id like "birthday-username")
+  if (eventId.startsWith('birthday-')) {
+    const username = eventId.replace('birthday-', '');
+    const user = db.prepare('SELECT username, fullName, birthday FROM users WHERE username = ?').get(username);
+    if (!user || !user.birthday) {
+      return res.status(404).json({ error: 'Birthday not found' });
+    }
+    const [byr, bmo, bdy] = user.birthday.split('-');
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+    const thisYear = now.getFullYear();
+    const ics = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SH Underground//Calendar//EN',
+      'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:birthday-${username}@sh-underground`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${thisYear}${bmo}${bdy}`,
+      `DTEND;VALUE=DATE:${thisYear}${bmo}${String(parseInt(bdy) + 1).padStart(2, '0')}`,
+      `SUMMARY:🎂 ${user.fullName || username}'s Birthday`,
+      'RRULE:FREQ=YEARLY',
+      'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n');
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=birthday-${username}.ics`);
+    return res.send(ics);
+  }
+
+  const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(eventId);
   if (!event) {
     return res.status(404).json({ error: 'Event not found' });
   }
@@ -733,7 +850,30 @@ app.get('/api/events', requireAuth, (req, res) => {
        AND (visibility = 'community' OR created_by = ?)
      ORDER BY event_date, event_time`
   ).all(startDate, endDate, req.user.username);
-  res.json(events);
+
+  // Inject birthday events for users with birthdays in this month
+  const monthNum = month.split('-')[1]; // "03" from "2026-03"
+  const year = month.split('-')[0];
+  const usersWithBirthdays = db.prepare(
+    `SELECT username, fullName, birthday FROM users WHERE birthday != '' AND birthday IS NOT NULL`
+  ).all();
+  
+  const birthdayEvents = usersWithBirthdays
+    .filter(u => u.birthday && u.birthday.substring(5, 7) === monthNum)
+    .map(u => ({
+      id: `birthday-${u.username}`,
+      title: `🎂 ${u.fullName || u.username}'s Birthday`,
+      event_date: `${year}-${u.birthday.substring(5)}`,
+      event_time: '',
+      description: '',
+      location: '',
+      visibility: 'community',
+      created_by: 'system',
+      recurrence: 'yearly',
+      isBirthday: true,
+    }));
+
+  res.json([...events, ...birthdayEvents]);
 });
 
 // Calendar Events: Get single event
