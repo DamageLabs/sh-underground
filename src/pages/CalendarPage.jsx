@@ -211,6 +211,28 @@ function CalendarPage() {
     }
   };
 
+  const handleExportCalendar = async () => {
+    try {
+      const currentUser = localStorage.getItem('location_app_current_user');
+      const headers = {};
+      if (currentUser) {
+        try { headers['x-username'] = JSON.parse(currentUser).username; } catch {}
+      }
+      const res = await fetch('/api/events/export/ics', { headers });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'sh-underground-calendar.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error('Calendar export failed:', err);
+    }
+  };
+
   const handleDownloadIcs = async (evt) => {
     const url = api.getEventIcsUrl(evt.id);
     const currentUser = localStorage.getItem('location_app_current_user');
@@ -251,6 +273,9 @@ function CalendarPage() {
         </Typography>
         <IconButton onClick={nextMonth}><ChevronRightIcon /></IconButton>
         <Box sx={{ flexGrow: 1 }} />
+        <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExportCalendar} sx={{ mr: 1 }}>
+          Export .ics
+        </Button>
         <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
           Add Event
         </Button>
