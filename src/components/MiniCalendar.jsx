@@ -18,7 +18,15 @@ function MiniCalendar() {
 
   useEffect(() => {
     api.getEvents(monthStr).then((events) => {
-      const days = new Set(events.map((e) => parseInt(e.event_date.split('-')[2], 10)));
+      const days = new Set();
+      events.forEach((e) => {
+        const startDay = parseInt(e.event_date.split('-')[2], 10);
+        days.add(startDay);
+        if (e.end_date) {
+          const endDay = parseInt(e.end_date.split('-')[2], 10);
+          for (let d = startDay; d <= endDay; d++) days.add(d);
+        }
+      });
       setEventDays(days);
     }).catch(() => {});
   }, [monthStr]);

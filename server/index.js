@@ -127,6 +127,9 @@ const calColNames = calCols.map(c => c.name);
 if (!calColNames.includes('recurrence')) {
   db.exec("ALTER TABLE calendar_events ADD COLUMN recurrence TEXT DEFAULT ''");
 }
+if (!calColNames.includes('end_date')) {
+  db.exec("ALTER TABLE calendar_events ADD COLUMN end_date TEXT DEFAULT ''");
+}
 
 app.use(cors());
 app.use(express.json());
@@ -846,10 +849,11 @@ app.get('/api/events', requireAuth, (req, res) => {
   const endDate = `${month}-31`;
   const events = db.prepare(
     `SELECT * FROM calendar_events
-     WHERE event_date >= ? AND event_date <= ?
+     WHERE ((event_date >= ? AND event_date <= ?)
+            OR (end_date != '' AND end_date IS NOT NULL AND event_date <= ? AND end_date >= ?))
        AND (visibility = 'community' OR created_by = ?)
      ORDER BY event_date, event_time`
-  ).all(startDate, endDate, req.user.username);
+  ).all(startDate, endDate, endDate, startDate, req.user.username);
 
   // Inject birthday events for users with birthdays in this month
   const monthNum = month.split('-')[1]; // "03" from "2026-03"
@@ -890,7 +894,7 @@ app.get('/api/events/:id', requireAuth, (req, res) => {
 
 // Calendar Events: Create
 app.post('/api/events', requireAuth, (req, res) => {
-  const { title, event_date, event_time, description, location, visibility, recurrence } = req.body;
+  const { title, event_date, event_time, end_date, description, location, visibility, recurrence } = req.body;
   if (!title || !event_date) {
     return res.status(400).json({ error: 'title and event_date are required' });
   }
@@ -899,12 +903,13 @@ app.post('/api/events', requireAuth, (req, res) => {
   }
   const now = Date.now();
   const result = db.prepare(
-    `INSERT INTO calendar_events (title, event_date, event_time, description, location, visibility, recurrence, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO calendar_events (title, event_date, event_time, end_date, description, location, visibility, recurrence, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     title,
     event_date,
     event_time || null,
+    end_date || '',
     description || '',
     location || '',
     visibility || 'personal',
@@ -926,17 +931,18 @@ app.put('/api/events/:id', requireAuth, (req, res) => {
   if (event.created_by !== req.user.username) {
     return res.status(403).json({ error: 'Only the event creator can edit' });
   }
-  const { title, event_date, event_time, description, location, visibility, recurrence } = req.body;
+  const { title, event_date, event_time, end_date, description, location, visibility, recurrence } = req.body;
   if (visibility && !['community', 'personal'].includes(visibility)) {
     return res.status(400).json({ error: 'visibility must be community or personal' });
   }
   db.prepare(
-    `UPDATE calendar_events SET title = ?, event_date = ?, event_time = ?, description = ?, location = ?, visibility = ?, recurrence = ?, updated_at = ?
+    `UPDATE calendar_events SET title = ?, event_date = ?, event_time = ?, end_date = ?, description = ?, location = ?, visibility = ?, recurrence = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     title !== undefined ? title : event.title,
     event_date !== undefined ? event_date : event.event_date,
     event_time !== undefined ? (event_time || null) : event.event_time,
+    end_date !== undefined ? end_date : (event.end_date || ''),
     description !== undefined ? description : event.description,
     location !== undefined ? location : event.location,
     visibility !== undefined ? visibility : event.visibility,
