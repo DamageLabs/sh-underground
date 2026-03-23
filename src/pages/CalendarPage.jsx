@@ -156,6 +156,80 @@ function CalendarPage() {
     });
   };
 
+  // Get multi-day events that span across a week row
+  const getMultiDayEventsForWeek = (weekCells) => {
+    const multiDayEvents = [];
+    const processedEvents = new Set();
+
+    weekCells.forEach((day, dayIndex) => {
+      if (!day) return;
+
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayEvents = events.filter((e) => {
+        if (!e.end_date) return false; // Only multi-day events
+        return dateStr >= e.event_date && dateStr <= e.end_date;
+      });
+
+      dayEvents.forEach((evt) => {
+        if (processedEvents.has(evt.id)) return;
+        processedEvents.add(evt.id);
+
+        // Calculate start and end columns within this week
+        const eventStartDate = new Date(evt.event_date + 'T00:00:00');
+        const eventEndDate = new Date(evt.end_date + 'T00:00:00');
+        const weekStartDay = weekCells[0];
+        
+        if (!weekStartDay) return;
+
+        const weekStartDate = new Date(year, month, weekStartDay);
+        const weekEndDate = new Date(year, month, weekStartDay + 6);
+
+        // Clamp event dates to this week
+        const clampedStart = new Date(Math.max(eventStartDate.getTime(), weekStartDate.getTime()));
+        const clampedEnd = new Date(Math.min(eventEndDate.getTime(), weekEndDate.getTime()));
+
+        // Find column indices
+        let startCol = -1;
+        let endCol = -1;
+
+        weekCells.forEach((weekDay, index) => {
+          if (!weekDay) return;
+          const cellDate = new Date(year, month, weekDay);
+          
+          if (cellDate.getTime() === clampedStart.getTime()) {
+            startCol = index;
+          }
+          if (cellDate.getTime() === clampedEnd.getTime()) {
+            endCol = index;
+          }
+        });
+
+        if (startCol >= 0 && endCol >= 0) {
+          multiDayEvents.push({
+            ...evt,
+            startCol,
+            endCol,
+            startsBeforeWeek: eventStartDate < weekStartDate,
+            endsAfterWeek: eventEndDate > weekEndDate,
+          });
+        }
+      });
+    });
+
+    return multiDayEvents;
+  };
+
+  // Get single-day events (including single-day from multi-day events)
+  const getSingleDayEvents = (d) => {
+    if (!d) return [];
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return events.filter((e) => {
+      // Include single-day events only
+      if (e.end_date) return false;
+      return e.event_date === dateStr;
+    });
+  };
+
   const selectedDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
   const selectedEvents = events.filter((e) => {
     if (e.end_date) {
@@ -295,65 +369,150 @@ function CalendarPage() {
 
       {/* Calendar grid */}
       <Box sx={{
-        display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', border: '1px solid',
-        borderColor: 'divider', borderRadius: 1, overflow: 'hidden',
+        border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden',
       }}>
         {/* Day headers */}
-        {DAYS.map((d) => (
-          <Box key={d} sx={{ p: 1, textAlign: 'center', bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="caption" sx={{ fontWeight: 'bold' }}>{d}</Typography>
-          </Box>
-        ))}
-        {/* Day cells */}
-        {cells.map((d, i) => {
-          const dayEvents = eventsForDay(d);
-          const maxShow = 2;
-          return (
-            <Box
-              key={i}
-              onClick={() => d && setSelectedDay(d)}
-              sx={{
-                minHeight: 100, p: 0.5, borderBottom: '1px solid', borderRight: '1px solid',
-                borderColor: 'divider', cursor: d ? 'pointer' : 'default',
-                bgcolor: d === selectedDay ? 'rgba(212,175,55,0.08)' : 'transparent',
-                borderLeft: isToday(d) ? '3px solid' : 'none',
-                borderLeftColor: isToday(d) ? 'primary.main' : 'transparent',
-                '&:hover': d ? { bgcolor: 'rgba(212,175,55,0.04)' } : {},
-              }}
-            >
-              {d && (
-                <>
-                  <Typography variant="caption" sx={{
-                    fontWeight: isToday(d) ? 'bold' : 'normal',
-                    color: isToday(d) ? 'primary.main' : 'text.primary',
-                  }}>
-                    {d}
-                  </Typography>
-                  <Box sx={{ mt: 0.25 }}>
-                    {dayEvents.slice(0, maxShow).map((evt) => (
-                      <Chip
-                        key={evt.id}
-                        label={evt.title}
-                        size="small"
-                        sx={{
-                          height: 18, fontSize: '0.65rem', mb: 0.25, maxWidth: '100%',
-                          bgcolor: evt.visibility === 'community' ? 'rgba(212,175,55,0.2)' : 'action.selected',
-                          color: evt.visibility === 'community' ? 'primary.main' : 'text.secondary',
-                          '& .MuiChip-label': { px: 0.5 },
-                        }}
-                      />
-                    ))}
-                    {dayEvents.length > maxShow && (
-                      <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.secondary' }}>
-                        +{dayEvents.length - maxShow} more
-                      </Typography>
-                    )}
-                  </Box>
-                </>
-              )}
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+          {DAYS.map((d) => (
+            <Box key={d} sx={{ p: 1, textAlign: 'center', bgcolor: 'action.hover', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold' }}>{d}</Typography>
             </Box>
-          );
-        })}
+          ))}
+        </Box>
+
+        {/* Week rows */}
+        {(() => {
+          const weeks = [];
+          for (let i = 0; i < cells.length; i += 7) {
+            weeks.push(cells.slice(i, i + 7));
+          }
+          
+          return weeks.map((weekCells, weekIndex) => {
+            const multiDayEvents = getMultiDayEventsForWeek(weekCells);
+            
+            return (
+              <Box
+                key={weekIndex}
+                sx={{
+                  position: 'relative',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                }}
+              >
+                {/* Day cells for this week */}
+                {weekCells.map((d, dayIndex) => {
+                  const singleDayEvents = getSingleDayEvents(d);
+                  const maxShow = 1; // Reduced to make room for spanning bars
+                  
+                  return (
+                    <Box
+                      key={`${weekIndex}-${dayIndex}`}
+                      onClick={() => d && setSelectedDay(d)}
+                      sx={{
+                        minHeight: 100,
+                        p: 0.5,
+                        pt: 2, // Extra padding top for spanning bars
+                        borderBottom: '1px solid',
+                        borderRight: dayIndex < 6 ? '1px solid' : 'none',
+                        borderColor: 'divider',
+                        cursor: d ? 'pointer' : 'default',
+                        bgcolor: d === selectedDay ? 'rgba(212,175,55,0.08)' : 'transparent',
+                        borderLeft: isToday(d) ? '3px solid' : 'none',
+                        borderLeftColor: isToday(d) ? 'primary.main' : 'transparent',
+                        '&:hover': d ? { bgcolor: 'rgba(212,175,55,0.04)' } : {},
+                      }}
+                    >
+                      {d && (
+                        <>
+                          <Typography variant="caption" sx={{
+                            fontWeight: isToday(d) ? 'bold' : 'normal',
+                            color: isToday(d) ? 'primary.main' : 'text.primary',
+                          }}>
+                            {d}
+                          </Typography>
+                          <Box sx={{ mt: 0.25 }}>
+                            {singleDayEvents.slice(0, maxShow).map((evt) => (
+                              <Chip
+                                key={evt.id}
+                                label={evt.title}
+                                size="small"
+                                sx={{
+                                  height: 18, fontSize: '0.65rem', mb: 0.25, maxWidth: '100%',
+                                  bgcolor: evt.visibility === 'community' ? 'rgba(212,175,55,0.2)' : 'action.selected',
+                                  color: evt.visibility === 'community' ? 'primary.main' : 'text.secondary',
+                                  '& .MuiChip-label': { px: 0.5 },
+                                }}
+                              />
+                            ))}
+                            {singleDayEvents.length > maxShow && (
+                              <Typography variant="caption" sx={{ fontSize: '0.6rem', color: 'text.secondary' }}>
+                                +{singleDayEvents.length - maxShow} more
+                              </Typography>
+                            )}
+                          </Box>
+                        </>
+                      )}
+                    </Box>
+                  );
+                })}
+
+                {/* Multi-day event bars */}
+                {multiDayEvents.map((evt, eventIndex) => {
+                  const leftPercentage = (evt.startCol / 7) * 100;
+                  const widthPercentage = ((evt.endCol - evt.startCol + 1) / 7) * 100;
+                  
+                  return (
+                    <Box
+                      key={`bar-${evt.id}-${weekIndex}`}
+                      onClick={() => {
+                        // Find the first day of this event in this week and select it
+                        const firstDay = weekCells[evt.startCol];
+                        if (firstDay) setSelectedDay(firstDay);
+                      }}
+                      sx={{
+                        position: 'absolute',
+                        top: 4,
+                        left: `${leftPercentage}%`,
+                        width: `${widthPercentage}%`,
+                        height: 20,
+                        backgroundColor: evt.visibility === 'community' ? 'rgba(212, 175, 55, 0.3)' : 'rgba(158, 158, 158, 0.3)',
+                        border: '1px solid',
+                        borderColor: evt.visibility === 'community' ? 'rgba(212, 175, 55, 0.6)' : 'rgba(158, 158, 158, 0.6)',
+                        borderRadius: 1,
+                        borderTopLeftRadius: evt.startsBeforeWeek ? 0 : 1,
+                        borderBottomLeftRadius: evt.startsBeforeWeek ? 0 : 1,
+                        borderTopRightRadius: evt.endsAfterWeek ? 0 : 1,
+                        borderBottomRightRadius: evt.endsAfterWeek ? 0 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        px: 1,
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        '&:hover': {
+                          backgroundColor: evt.visibility === 'community' ? 'rgba(212, 175, 55, 0.4)' : 'rgba(158, 158, 158, 0.4)',
+                        },
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '0.65rem',
+                          fontWeight: 500,
+                          color: evt.visibility === 'community' ? 'rgba(212, 175, 55, 1)' : 'rgba(97, 97, 97, 1)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {evt.title}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            );
+          });
+        })()}
       </Box>
 
       {/* Selected day detail */}
