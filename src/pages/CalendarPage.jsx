@@ -558,7 +558,12 @@ function CalendarPage() {
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', color: 'text.secondary', fontSize: '0.85rem' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <AccessTimeIcon sx={{ fontSize: 16 }} />
-                  <Typography variant="body2">{formatTime(evt.event_time)}</Typography>
+                  <Typography variant="body2">
+                    {evt.end_date && evt.end_date !== evt.event_date
+                      ? `${new Date(evt.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${evt.event_time ? ' ' + formatTime(evt.event_time) : ''} → ${new Date(evt.end_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+                      : formatTime(evt.event_time)
+                    }
+                  </Typography>
                 </Box>
                 {evt.location && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
