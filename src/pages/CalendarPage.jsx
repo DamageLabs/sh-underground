@@ -360,7 +360,11 @@ function CalendarPage() {
         <IconButton onClick={nextMonth}><ChevronRightIcon /></IconButton>
         <Box sx={{ flexGrow: 1 }} />
         <Button variant="outlined" onClick={() => {
-          const url = `webcal://${window.location.host}/api/calendar/subscribe`;
+          // In production, use the same host. In dev, point to backend directly.
+          const host = window.location.hostname === 'localhost' 
+            ? `${window.location.hostname}:3002` 
+            : window.location.host;
+          const url = `webcal://${host}/api/calendar/subscribe`;
           window.open(url);
         }} sx={{ mr: 1 }}>
           📅 Subscribe
