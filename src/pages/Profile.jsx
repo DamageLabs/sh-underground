@@ -49,6 +49,7 @@ function Profile() {
   const { user, updateLocation, updateProfile, changePassword, refreshUser } = useAuth();
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [birthday, setBirthday] = useState(user?.birthday || '');
+  const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [markerColor, setMarkerColor] = useState(user?.markerColor || 'red');
   const [markerColors, setMarkerColors] = useState([]);
   const [locationInput, setLocationInput] = useState(user?.location || '');
@@ -154,7 +155,7 @@ function Profile() {
 
   const handleSaveProfile = async () => {
     try {
-      await updateProfile({ fullName, markerColor, birthday });
+      await updateProfile({ fullName, displayName, markerColor, birthday });
       setSuccess('Profile saved successfully!');
     } catch (err) {
       setError(err.message);
@@ -351,6 +352,14 @@ function Profile() {
             placeholder="Enter your full name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+          />
+          <TextField
+            sx={{ flex: 1, minWidth: 200 }}
+            label="Display Name"
+            placeholder="Shown on map (leave blank to use username)"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            inputProps={{ maxLength: 30 }}
           />
           <TextField
             sx={{ minWidth: 180 }}

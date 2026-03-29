@@ -77,6 +77,9 @@ if (!columnNames.includes('resetTokenExpires')) {
 if (!columnNames.includes('birthday')) {
   db.exec("ALTER TABLE users ADD COLUMN birthday TEXT DEFAULT ''");
 }
+if (!columnNames.includes('display_name')) {
+  db.exec("ALTER TABLE users ADD COLUMN display_name TEXT DEFAULT ''");
+}
 
 const RESET_TOKEN_EXPIRY_HOURS = 24;
 
@@ -186,6 +189,7 @@ const formatUser = (row) => ({
   markerColor: row.markerColor || 'red',
   profilePhoto: row.profilePhoto || null,
   birthday: row.birthday || '',
+  displayName: row.display_name || '',
 });
 
 const formatUserSession = (row) => ({
@@ -197,6 +201,7 @@ const formatUserSession = (row) => ({
   markerColor: row.markerColor || 'red',
   profilePhoto: row.profilePhoto || null,
   birthday: row.birthday || '',
+  displayName: row.display_name || '',
 });
 
 // Register
@@ -298,7 +303,7 @@ app.get('/api/user/:username', (req, res) => {
 // Update user profile
 app.put('/api/user/:username', (req, res) => {
   const { username } = req.params;
-  const { fullName, location, coordinates, markerColor, birthday } = req.body;
+  const { fullName, location, coordinates, markerColor, birthday, displayName } = req.body;
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 
@@ -316,12 +321,13 @@ app.put('/api/user/:username', (req, res) => {
     longitude: coordinates?.lng !== undefined ? coordinates.lng : user.longitude,
     markerColor: validMarkerColor || 'red',
     birthday: birthday !== undefined ? birthday : (user.birthday || ''),
+    displayName: displayName !== undefined ? displayName : (user.display_name || ''),
   };
 
   db.prepare(`
-    UPDATE users SET fullName = ?, location = ?, latitude = ?, longitude = ?, markerColor = ?, birthday = ?
+    UPDATE users SET fullName = ?, location = ?, latitude = ?, longitude = ?, markerColor = ?, birthday = ?, display_name = ?
     WHERE username = ?
-  `).run(updates.fullName, updates.location, updates.latitude, updates.longitude, updates.markerColor, updates.birthday, username);
+  `).run(updates.fullName, updates.location, updates.latitude, updates.longitude, updates.markerColor, updates.birthday, updates.displayName, username);
 
   const updated = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   res.json(formatUserSession(updated));
