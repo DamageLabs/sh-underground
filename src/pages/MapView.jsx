@@ -80,6 +80,7 @@ function MapView() {
               locationName={user.location}
               username={user.username}
               fullName={user.fullName}
+              displayName={user.displayName}
               markerColor={user.markerColor}
               profilePhoto={user.profilePhoto}
               otherUsers={otherUsers}

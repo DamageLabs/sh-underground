@@ -18,7 +18,7 @@ const getPhotoUrl = (photoPath) => {
   return `/api${photoPath}`;
 };
 
-function LocationMap({ coordinates, locationName, username, fullName, markerColor = 'red', profilePhoto = null, otherUsers = [], onMapClick }) {
+function LocationMap({ coordinates, locationName, username, fullName, displayName, markerColor = 'red', profilePhoto = null, otherUsers = [], onMapClick }) {
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
@@ -83,7 +83,7 @@ function LocationMap({ coordinates, locationName, username, fullName, markerColo
         <MarkerF
           position={coordinates}
           onClick={handleMarkerClick}
-          label={username ? { text: username, color: '#000', fontWeight: 'bold', fontSize: '14px' } : undefined}
+          label={(displayName || username) ? { text: displayName || username, color: '#000', fontWeight: 'bold', fontSize: '14px' } : undefined}
           icon={{
             url: `http://maps.google.com/mapfiles/ms/icons/${markerColor}-dot.png`,
             scaledSize: new window.google.maps.Size(50, 50),
@@ -135,7 +135,7 @@ function LocationMap({ coordinates, locationName, username, fullName, markerColo
           key={person.id}
           position={person.coordinates}
           onClick={() => setSelectedUser(person)}
-          label={{ text: person.username, color: '#000', fontWeight: 'bold', fontSize: '12px' }}
+          label={{ text: person.displayName || person.username, color: '#000', fontWeight: 'bold', fontSize: '12px' }}
           icon={{
             url: `http://maps.google.com/mapfiles/ms/icons/${person.markerColor || 'blue'}-dot.png`,
             scaledSize: new window.google.maps.Size(40, 40),
