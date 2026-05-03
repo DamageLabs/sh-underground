@@ -116,6 +116,9 @@ function Login() {
               <Typography variant="body2" color="text.secondary">
                 Need an account? Ask a member for an invite link.
               </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Forgot your password? Contact an admin for a reset link.
+              </Typography>
             </Box>
           </Box>
         </Paper>

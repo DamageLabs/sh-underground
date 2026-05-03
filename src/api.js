@@ -76,6 +76,36 @@ export const api = {
     return res.json();
   },
 
+  async generateResetToken(username) {
+    const res = await fetch(`${API_BASE}/admin/user/${username}/reset-token`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to generate reset token');
+    }
+    return res.json();
+  },
+
+  async verifyResetToken(token) {
+    const res = await fetch(`${API_BASE}/verify-reset-token/${token}`);
+    return res.json();
+  },
+
+  async resetPassword(token, newPassword) {
+    const res = await fetch(`${API_BASE}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to reset password');
+    }
+    return res.json();
+  },
+
   async getAllUsers() {
     const res = await fetch(`${API_BASE}/users`);
     if (!res.ok) {
