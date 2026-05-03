@@ -30,6 +30,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import BlockIcon from '@mui/icons-material/Block';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import LockResetIcon from '@mui/icons-material/LockReset';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api';
@@ -52,6 +54,9 @@ function AdminDashboard() {
   const [calendarImportDialogOpen, setCalendarImportDialogOpen] = useState(false);
   const [calendarImportData, setCalendarImportData] = useState(null);
   const [calendarImportMode, setCalendarImportMode] = useState('merge');
+  const [resetLinkDialogOpen, setResetLinkDialogOpen] = useState(false);
+  const [resetLinkData, setResetLinkData] = useState(null);
+  const [resetLinkCopied, setResetLinkCopied] = useState(false);
   const fileInputRef = useRef(null);
   const calendarFileInputRef = useRef(null);
 
@@ -110,6 +115,30 @@ function AdminDashboard() {
     });
     setEditDialogOpen(true);
     setError('');
+  };
+
+  const handleGenerateResetLink = async (userToReset) => {
+    setError('');
+    try {
+      const data = await api.generateResetToken(userToReset.username);
+      const fullUrl = `${window.location.origin}/reset-password?token=${data.resetToken}`;
+      setResetLinkData({ ...data, fullUrl });
+      setResetLinkCopied(false);
+      setResetLinkDialogOpen(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCopyResetLink = async () => {
+    if (!resetLinkData) return;
+    try {
+      await navigator.clipboard.writeText(resetLinkData.fullUrl);
+      setResetLinkCopied(true);
+      setTimeout(() => setResetLinkCopied(false), 2000);
+    } catch {
+      setError('Failed to copy to clipboard');
+    }
   };
 
   const handleDeleteClick = (userToDelete) => {
@@ -336,14 +365,24 @@ function AdminDashboard() {
                       color="primary"
                       onClick={() => handleEditClick(u)}
                       size="small"
+                      title="Edit user"
                     >
                       <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      color="warning"
+                      onClick={() => handleGenerateResetLink(u)}
+                      size="small"
+                      title="Generate password reset link"
+                    >
+                      <LockResetIcon />
                     </IconButton>
                     <IconButton
                       color="error"
                       onClick={() => handleDeleteClick(u)}
                       size="small"
                       disabled={u.username === user.username}
+                      title="Delete user"
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -401,6 +440,42 @@ function AdminDashboard() {
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reset Link Dialog */}
+      <Dialog open={resetLinkDialogOpen} onClose={() => setResetLinkDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Password Reset Link</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Send this link to <strong>{resetLinkData?.username}</strong>. It expires in 24 hours and can only be used once.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            value={resetLinkData?.fullUrl || ''}
+            InputProps={{
+              readOnly: true,
+              sx: { fontFamily: 'monospace', fontSize: '0.85rem' },
+            }}
+            onClick={(e) => e.target.select()}
+          />
+          {resetLinkData?.expiresAt && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Expires: {new Date(resetLinkData.expiresAt).toLocaleString()}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetLinkDialogOpen(false)}>Close</Button>
+          <Button
+            onClick={handleCopyResetLink}
+            variant="contained"
+            startIcon={<ContentCopyIcon />}
+            color={resetLinkCopied ? 'success' : 'primary'}
+          >
+            {resetLinkCopied ? 'Copied!' : 'Copy Link'}
           </Button>
         </DialogActions>
       </Dialog>
