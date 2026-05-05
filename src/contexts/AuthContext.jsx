@@ -4,7 +4,6 @@ import { api } from '../api';
 const AuthContext = createContext(null);
 
 const CURRENT_USER_KEY = 'location_app_current_user';
-const ADMIN_USERS = ['guntharp'];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -18,12 +17,10 @@ export function AuthProvider({ children }) {
         try {
           // Refresh user data from server
           const freshUser = await api.getUser(parsed.username);
-          freshUser.isAdmin = ADMIN_USERS.includes(freshUser.username);
           setUser(freshUser);
           localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(freshUser));
         } catch {
           // If server fails, use cached data
-          parsed.isAdmin = ADMIN_USERS.includes(parsed.username);
           setUser(parsed);
         }
       }
@@ -32,20 +29,31 @@ export function AuthProvider({ children }) {
     initAuth();
   }, []);
 
+  const persistSession = (session) => {
+    setUser(session);
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(session));
+  };
+
   const register = async (username, password, inviteToken) => {
     const userSession = await api.register(username, password, inviteToken);
-    userSession.isAdmin = ADMIN_USERS.includes(username);
-    setUser(userSession);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession));
+    persistSession(userSession);
     return userSession;
   };
 
   const login = async (username, password) => {
-    const userSession = await api.login(username, password);
-    userSession.isAdmin = ADMIN_USERS.includes(username);
-    setUser(userSession);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession));
-    return userSession;
+    const response = await api.login(username, password);
+    // If migration is required, do NOT establish a session — caller must complete migration first
+    if (response.needsMigration) {
+      return response;
+    }
+    persistSession(response);
+    return response;
+  };
+
+  const completeMigration = async (currentUsername, password, newUsername) => {
+    const response = await api.migrateUsername(currentUsername, password, newUsername);
+    persistSession(response);
+    return response;
   };
 
   const logout = () => {
@@ -55,16 +63,12 @@ export function AuthProvider({ children }) {
 
   const updateLocation = async (location, coordinates) => {
     const updatedUser = await api.updateUser(user.username, { location, coordinates });
-    updatedUser.isAdmin = user.isAdmin;
-    setUser(updatedUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+    persistSession(updatedUser);
   };
 
   const updateProfile = async (profileData) => {
     const updatedUser = await api.updateUser(user.username, profileData);
-    updatedUser.isAdmin = user.isAdmin;
-    setUser(updatedUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+    persistSession(updatedUser);
   };
 
   const changePassword = async (currentPassword, newPassword) => {
@@ -74,9 +78,7 @@ export function AuthProvider({ children }) {
   const refreshUser = async () => {
     if (!user?.username) return;
     const freshUser = await api.getUser(user.username);
-    freshUser.isAdmin = user.isAdmin;
-    setUser(freshUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(freshUser));
+    persistSession(freshUser);
   };
 
   const value = {
@@ -84,6 +86,7 @@ export function AuthProvider({ children }) {
     loading,
     register,
     login,
+    completeMigration,
     logout,
     updateLocation,
     updateProfile,

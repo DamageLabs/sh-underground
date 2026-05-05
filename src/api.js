@@ -41,6 +41,19 @@ export const api = {
     return res.json();
   },
 
+  async migrateUsername(currentUsername, password, newUsername) {
+    const res = await fetch(`${API_BASE}/migrate-username`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentUsername, password, newUsername }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Migration failed');
+    }
+    return res.json();
+  },
+
   async getUser(username) {
     const res = await fetch(`${API_BASE}/user/${username}`);
     if (!res.ok) {

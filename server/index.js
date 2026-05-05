@@ -7,6 +7,7 @@ const multer = require('multer');
 const Database = require('better-sqlite3');
 
 const SALT_ROUNDS = 10;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const app = express();
 const PORT = 3002;
@@ -206,10 +207,15 @@ const formatUserSession = (row) => ({
 
 // Register
 app.post('/api/register', async (req, res) => {
-  const { username, password, inviteToken } = req.body;
+  const { username: rawUsername, password, inviteToken } = req.body;
 
-  if (!username || !password) {
+  if (!rawUsername || !password) {
     return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  const username = String(rawUsername).trim().toLowerCase();
+  if (!EMAIL_REGEX.test(username)) {
+    return res.status(400).json({ error: 'Username must be a valid email address' });
   }
 
   if (!inviteToken) {
@@ -228,7 +234,7 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'Invite token has been revoked' });
   }
 
-  const existing = db.prepare('SELECT username FROM users WHERE username = ?').get(username);
+  const existing = db.prepare('SELECT username FROM users WHERE username = ? COLLATE NOCASE').get(username);
   if (existing) {
     return res.status(400).json({ error: 'Username already exists' });
   }
@@ -271,9 +277,14 @@ app.post('/api/register', async (req, res) => {
 
 // Login
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username: rawUsername, password } = req.body;
 
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (!rawUsername || !password) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+
+  const lookup = String(rawUsername).trim();
+  const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(lookup);
 
   if (!user) {
     return res.status(401).json({ error: 'Invalid username or password' });
@@ -284,7 +295,88 @@ app.post('/api/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  res.json(formatUserSession(user));
+  res.json({
+    ...formatUserSession(user),
+    needsMigration: !EMAIL_REGEX.test(user.username),
+  });
+});
+
+// Migrate legacy username to email
+app.post('/api/migrate-username', async (req, res) => {
+  const { currentUsername, password, newUsername: rawNewUsername } = req.body;
+
+  if (!currentUsername || !password || !rawNewUsername) {
+    return res.status(400).json({ error: 'Current username, password, and new email required' });
+  }
+
+  const newUsername = String(rawNewUsername).trim().toLowerCase();
+  if (!EMAIL_REGEX.test(newUsername)) {
+    return res.status(400).json({ error: 'New username must be a valid email address' });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(currentUsername);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+
+  // If they're already an email, no-op
+  if (EMAIL_REGEX.test(user.username) && user.username === newUsername) {
+    return res.json(formatUserSession(user));
+  }
+
+  const collision = db.prepare('SELECT username FROM users WHERE username = ? COLLATE NOCASE').get(newUsername);
+  if (collision && collision.username.toLowerCase() !== user.username.toLowerCase()) {
+    return res.status(400).json({ error: 'That email is already in use' });
+  }
+
+  // Compute new photo URL/path if user has one
+  let newPhotoUrl = user.profilePhoto;
+  let oldPhotoPath = null;
+  let newPhotoPath = null;
+  if (user.profilePhoto) {
+    const oldFilename = path.basename(user.profilePhoto);
+    const prefix = `${user.username}-`;
+    if (oldFilename.startsWith(prefix)) {
+      const newFilename = `${newUsername}-${oldFilename.slice(prefix.length)}`;
+      oldPhotoPath = path.join(uploadsDir, oldFilename);
+      newPhotoPath = path.join(uploadsDir, newFilename);
+      newPhotoUrl = user.profilePhoto.replace(oldFilename, newFilename);
+    }
+  }
+
+  const migrate = db.transaction(() => {
+    db.prepare('UPDATE users SET username = ?, profilePhoto = ? WHERE username = ?')
+      .run(newUsername, newPhotoUrl, user.username);
+    db.prepare('UPDATE invite_tokens SET created_by = ? WHERE created_by = ?')
+      .run(newUsername, user.username);
+    db.prepare('UPDATE invite_tokens SET used_by = ? WHERE used_by = ?')
+      .run(newUsername, user.username);
+    db.prepare('UPDATE calendar_events SET created_by = ? WHERE created_by = ?')
+      .run(newUsername, user.username);
+  });
+
+  try {
+    migrate();
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+
+  // Rename photo file after DB commit (best-effort; URL already updated)
+  if (oldPhotoPath && newPhotoPath && fs.existsSync(oldPhotoPath)) {
+    try {
+      fs.renameSync(oldPhotoPath, newPhotoPath);
+    } catch {
+      // file rename failed — leave URL pointing at new name; admin can fix
+    }
+  }
+
+  const updated = db.prepare('SELECT * FROM users WHERE username = ?').get(newUsername);
+  res.json(formatUserSession(updated));
 });
 
 // Get current user (refresh session data)

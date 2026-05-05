@@ -12,6 +12,8 @@ import {
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function Register() {
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite');
@@ -27,13 +29,15 @@ function Register() {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password.trim()) {
+    const normalizedUsername = username.trim().toLowerCase();
+
+    if (!normalizedUsername || !password.trim()) {
       setError('Please fill in all fields');
       return;
     }
 
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters');
+    if (!EMAIL_REGEX.test(normalizedUsername)) {
+      setError('Username must be a valid email address');
       return;
     }
 
@@ -49,7 +53,7 @@ function Register() {
 
     setLoading(true);
     try {
-      await register(username, password, inviteToken);
+      await register(normalizedUsername, password, inviteToken);
       navigate('/app/profile');
     } catch (err) {
       setError(err.message);
@@ -124,9 +128,10 @@ function Register() {
                   required
                   fullWidth
                   id="username"
-                  label="Username"
+                  label="Email"
                   name="username"
-                  autoComplete="username"
+                  type="email"
+                  autoComplete="email"
                   autoFocus
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
