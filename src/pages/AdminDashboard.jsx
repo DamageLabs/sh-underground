@@ -23,6 +23,8 @@ import {
   Radio,
   RadioGroup,
   FormLabel,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -35,6 +37,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { api } from '../api';
+import AuditLogTab from './admin/AuditLogTab';
 
 function AdminDashboard() {
   const { user, isAdmin } = useAuth();
@@ -59,6 +62,7 @@ function AdminDashboard() {
   const [resetLinkCopied, setResetLinkCopied] = useState(false);
   const fileInputRef = useRef(null);
   const calendarFileInputRef = useRef(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
     loadUsers();
@@ -305,30 +309,6 @@ function AdminDashboard() {
           color="primary"
           size="small"
         />
-        <Box sx={{ flexGrow: 1 }} />
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={handleExport}
-          size="small"
-        >
-          Export
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<UploadIcon />}
-          onClick={handleImportClick}
-          size="small"
-        >
-          Import
-        </Button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          accept=".json"
-          style={{ display: 'none' }}
-        />
       </Box>
 
       {success && (
@@ -343,63 +323,76 @@ function AdminDashboard() {
         </Alert>
       )}
 
-      <Paper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Username</TableCell>
-                <TableCell>Full Name</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.username}>
-                  <TableCell>{u.username}</TableCell>
-                  <TableCell>{u.fullName || '-'}</TableCell>
-                  <TableCell>{u.location || '-'}</TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      color="primary"
-                      onClick={() => handleEditClick(u)}
-                      size="small"
-                      title="Edit user"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      color="warning"
-                      onClick={() => handleGenerateResetLink(u)}
-                      size="small"
-                      title="Generate password reset link"
-                    >
-                      <LockResetIcon />
-                    </IconButton>
-                    <IconButton
-                      color="error"
-                      onClick={() => handleDeleteClick(u)}
-                      size="small"
-                      disabled={u.username === user.username}
-                      title="Delete user"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {users.length === 0 && (
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => setActiveTab(v)}
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label="Users" />
+        <Tab label="Invites" />
+        <Tab label="Backup" />
+        <Tab label="Activity" />
+      </Tabs>
+
+      {activeTab === 0 && (
+        <Paper>
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    No users found
-                  </TableCell>
+                  <TableCell>Username</TableCell>
+                  <TableCell>Full Name</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell align="right">Actions</TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              </TableHead>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.username}>
+                    <TableCell>{u.username}</TableCell>
+                    <TableCell>{u.fullName || '-'}</TableCell>
+                    <TableCell>{u.location || '-'}</TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleEditClick(u)}
+                        size="small"
+                        title="Edit user"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        color="warning"
+                        onClick={() => handleGenerateResetLink(u)}
+                        size="small"
+                        title="Generate password reset link"
+                      >
+                        <LockResetIcon />
+                      </IconButton>
+                      <IconButton
+                        color="error"
+                        onClick={() => handleDeleteClick(u)}
+                        size="small"
+                        disabled={u.username === user.username}
+                        title="Delete user"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {users.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center">
+                      No users found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
@@ -514,65 +507,63 @@ function AdminDashboard() {
         </DialogActions>
       </Dialog>
 
-      {/* Invite Tokens Section */}
-      <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
-        Invite Tokens
-      </Typography>
-      <Paper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Token</TableCell>
-                <TableCell>Created By</TableCell>
-                <TableCell>Created At</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Used By</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {invites.map((invite) => {
-                const status = getInviteStatus(invite);
-                return (
-                  <TableRow key={invite.token}>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                        {invite.token.substring(0, 16)}...
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{invite.created_by}</TableCell>
-                    <TableCell>{new Date(invite.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Chip label={status.label} color={status.color} size="small" />
-                    </TableCell>
-                    <TableCell>{invite.used_by || '-'}</TableCell>
-                    <TableCell align="right">
-                      {!invite.used_by && !invite.revoked && (
-                        <IconButton
-                          color="error"
-                          onClick={() => handleRevokeClick(invite)}
-                          size="small"
-                          title="Revoke"
-                        >
-                          <BlockIcon />
-                        </IconButton>
-                      )}
+      {activeTab === 1 && (
+        <Paper>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Token</TableCell>
+                  <TableCell>Created By</TableCell>
+                  <TableCell>Created At</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Used By</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {invites.map((invite) => {
+                  const status = getInviteStatus(invite);
+                  return (
+                    <TableRow key={invite.token}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {invite.token.substring(0, 16)}...
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{invite.created_by}</TableCell>
+                      <TableCell>{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Chip label={status.label} color={status.color} size="small" />
+                      </TableCell>
+                      <TableCell>{invite.used_by || '-'}</TableCell>
+                      <TableCell align="right">
+                        {!invite.used_by && !invite.revoked && (
+                          <IconButton
+                            color="error"
+                            onClick={() => handleRevokeClick(invite)}
+                            size="small"
+                            title="Revoke"
+                          >
+                            <BlockIcon />
+                          </IconButton>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {invites.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      No invite tokens found
                     </TableCell>
                   </TableRow>
-                );
-              })}
-              {invites.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    No invite tokens found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       {/* Revoke Dialog */}
       <Dialog open={revokeDialogOpen} onClose={() => setRevokeDialogOpen(false)}>
@@ -590,37 +581,68 @@ function AdminDashboard() {
         </DialogActions>
       </Dialog>
 
-      {/* Calendar Backup Section */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 4, mb: 2, flexWrap: 'wrap' }}>
-        <CalendarMonthIcon color="primary" />
-        <Typography variant="h6">
-          Calendar Backup
-        </Typography>
-        <Box sx={{ flexGrow: 1 }} />
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={handleCalendarExport}
-          size="small"
-        >
-          Export Events
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<UploadIcon />}
-          onClick={handleCalendarImportClick}
-          size="small"
-        >
-          Import Events
-        </Button>
-        <input
-          type="file"
-          ref={calendarFileInputRef}
-          onChange={handleCalendarFileSelect}
-          accept=".json"
-          style={{ display: 'none' }}
-        />
-      </Box>
+      {activeTab === 2 && (
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+            <Typography variant="h6">Users</Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleExport}
+              size="small"
+            >
+              Export Users
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={handleImportClick}
+              size="small"
+            >
+              Import Users
+            </Button>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 4, mb: 2, flexWrap: 'wrap' }}>
+            <CalendarMonthIcon color="primary" />
+            <Typography variant="h6">Calendar Events</Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleCalendarExport}
+              size="small"
+            >
+              Export Events
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadIcon />}
+              onClick={handleCalendarImportClick}
+              size="small"
+            >
+              Import Events
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {activeTab === 3 && <AuditLogTab />}
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept=".json"
+        style={{ display: 'none' }}
+      />
+      <input
+        type="file"
+        ref={calendarFileInputRef}
+        onChange={handleCalendarFileSelect}
+        accept=".json"
+        style={{ display: 'none' }}
+      />
 
       {/* Calendar Import Dialog */}
       <Dialog open={calendarImportDialogOpen} onClose={() => setCalendarImportDialogOpen(false)} maxWidth="sm" fullWidth>

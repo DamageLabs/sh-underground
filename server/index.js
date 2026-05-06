@@ -12,6 +12,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const app = express();
 const PORT = 3002;
 
+// Trust the loopback proxy (Nginx in prod, Vite dev proxy locally) so req.ip
+// reflects the real client IP forwarded via X-Forwarded-For. 'loopback' rejects
+// header spoofing from non-localhost upstreams.
+app.set('trust proxy', 'loopback');
+
 // Ensure data directory exists
 const dataDir = path.join(__dirname, 'data');
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -148,6 +153,24 @@ if (!calColNames.includes('end_date')) {
   db.exec("ALTER TABLE calendar_events ADD COLUMN end_date TEXT DEFAULT ''");
 }
 
+// Audit log
+db.exec(`
+  CREATE TABLE IF NOT EXISTS audit_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    actor TEXT,
+    target TEXT,
+    details TEXT,
+    ip TEXT,
+    user_agent TEXT
+  )
+`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_events(timestamp DESC)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events(event_type)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_events(actor)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_events(target)');
+
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
@@ -219,37 +242,82 @@ const formatUserSession = (row) => ({
   displayName: row.display_name || '',
 });
 
+// Audit logging — must never throw out of the parent request
+const MAX_AUDIT_DETAILS_BYTES = 4096;
+const insertAuditStmt = db.prepare(`
+  INSERT INTO audit_events (timestamp, event_type, actor, target, details, ip, user_agent)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+
+function logEvent(req, { type, actor, target, details } = {}) {
+  try {
+    if (!type) return;
+    const resolvedActor = actor !== undefined ? actor : (req?.headers?.['x-username'] || null);
+    let detailsJson = null;
+    if (details !== undefined && details !== null) {
+      let serialized;
+      try {
+        serialized = JSON.stringify(details);
+      } catch {
+        serialized = JSON.stringify({ unserializable: true });
+      }
+      if (serialized && serialized.length > MAX_AUDIT_DETAILS_BYTES) {
+        serialized = JSON.stringify({ truncated: true, originalKeys: Object.keys(details) });
+      }
+      detailsJson = serialized;
+    }
+    insertAuditStmt.run(
+      Date.now(),
+      String(type),
+      resolvedActor || null,
+      target ?? null,
+      detailsJson,
+      req?.ip || null,
+      req?.headers?.['user-agent'] || null
+    );
+  } catch (err) {
+    console.error('[audit] logEvent failed:', err.message);
+  }
+}
+
 // Register
 app.post('/api/register', async (req, res) => {
   const { username: rawUsername, password, inviteToken } = req.body;
 
   if (!rawUsername || !password) {
+    logEvent(req, { type: 'auth.register.failure', actor: null, target: null, details: { reason: 'missing_credentials' } });
     return res.status(400).json({ error: 'Username and password required' });
   }
 
   const username = String(rawUsername).trim().toLowerCase();
   if (!EMAIL_REGEX.test(username)) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'invalid_email' } });
     return res.status(400).json({ error: 'Username must be a valid email address' });
   }
 
   if (!inviteToken) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'missing_invite_token' } });
     return res.status(400).json({ error: 'Invite token required' });
   }
 
   // Validate invite token
   const invite = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(inviteToken);
   if (!invite) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'invalid_token' } });
     return res.status(400).json({ error: 'Invalid invite token' });
   }
   if (invite.used_by) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'token_used' } });
     return res.status(400).json({ error: 'Invite token has already been used' });
   }
   if (invite.revoked) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'token_revoked' } });
     return res.status(400).json({ error: 'Invite token has been revoked' });
   }
 
   const existing = db.prepare('SELECT username FROM users WHERE username = ? COLLATE NOCASE').get(username);
   if (existing) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'username_exists' } });
     return res.status(400).json({ error: 'Username already exists' });
   }
 
@@ -275,8 +343,11 @@ app.post('/api/register', async (req, res) => {
   try {
     createUser();
   } catch (err) {
+    logEvent(req, { type: 'auth.register.failure', actor: username, target: username, details: { reason: 'race_lost' } });
     return res.status(400).json({ error: err.message });
   }
+
+  logEvent(req, { type: 'auth.register.success', actor: username, target: username, details: { inviteTokenPrefix: String(inviteToken).slice(0, 8) } });
 
   res.json({
     username,
@@ -294,6 +365,7 @@ app.post('/api/login', async (req, res) => {
   const { username: rawUsername, password } = req.body;
 
   if (!rawUsername || !password) {
+    logEvent(req, { type: 'auth.login.failure', actor: null, target: null, details: { reason: 'missing_credentials' } });
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
@@ -301,13 +373,17 @@ app.post('/api/login', async (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(lookup);
 
   if (!user) {
+    logEvent(req, { type: 'auth.login.failure', actor: lookup, target: lookup, details: { reason: 'no_user' } });
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
   const passwordMatch = await bcrypt.compare(password, user.password);
   if (!passwordMatch) {
+    logEvent(req, { type: 'auth.login.failure', actor: user.username, target: user.username, details: { reason: 'bad_password' } });
     return res.status(401).json({ error: 'Invalid username or password' });
   }
+
+  logEvent(req, { type: 'auth.login.success', actor: user.username, target: user.username });
 
   res.json({
     ...formatUserSession(user),
@@ -390,6 +466,7 @@ app.post('/api/migrate-username', async (req, res) => {
   }
 
   const updated = db.prepare('SELECT * FROM users WHERE username = ?').get(newUsername);
+  logEvent(req, { type: 'auth.username.migrated', actor: newUsername, target: newUsername, details: { from: user.username } });
   res.json(formatUserSession(updated));
 });
 
@@ -435,6 +512,16 @@ app.put('/api/user/:username', (req, res) => {
     WHERE username = ?
   `).run(updates.fullName, updates.location, updates.latitude, updates.longitude, updates.markerColor, updates.birthday, updates.displayName, username);
 
+  const changedFields = [];
+  if (fullName !== undefined && fullName !== (user.fullName || '')) changedFields.push('fullName');
+  if (location !== undefined && location !== user.location) changedFields.push('location');
+  if (coordinates?.lat !== undefined && coordinates.lat !== user.latitude) changedFields.push('coordinates');
+  if (coordinates?.lng !== undefined && coordinates.lng !== user.longitude && !changedFields.includes('coordinates')) changedFields.push('coordinates');
+  if (markerColor !== undefined && validMarkerColor !== (user.markerColor || 'red')) changedFields.push('markerColor');
+  if (birthday !== undefined && birthday !== (user.birthday || '')) changedFields.push('birthday');
+  if (displayName !== undefined && displayName !== (user.display_name || '')) changedFields.push('displayName');
+  logEvent(req, { type: 'user.profile.updated', target: username, details: { changedFields } });
+
   const updated = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   res.json(formatUserSession(updated));
 });
@@ -452,11 +539,13 @@ app.put('/api/user/:username/password', async (req, res) => {
 
   const passwordMatch = await bcrypt.compare(currentPassword, user.password);
   if (!passwordMatch) {
+    logEvent(req, { type: 'auth.password.change_failed', actor: username, target: username, details: { reason: 'bad_current_password' } });
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
   db.prepare('UPDATE users SET password = ? WHERE username = ?').run(hashedPassword, username);
+  logEvent(req, { type: 'auth.password.changed', actor: username, target: username });
 
   res.json({ success: true });
 });
@@ -472,18 +561,21 @@ app.post('/api/reset-password', async (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE resetToken = ?').get(token);
 
   if (!user) {
+    logEvent(req, { type: 'auth.password.reset_token_invalid', actor: null, target: null, details: { reason: 'unknown_token' } });
     return res.status(400).json({ error: 'Invalid or expired reset token' });
   }
 
   if (user.resetTokenExpires && user.resetTokenExpires < Date.now()) {
     // Clear expired token
     db.prepare('UPDATE users SET resetToken = NULL, resetTokenExpires = NULL WHERE username = ?').run(user.username);
+    logEvent(req, { type: 'auth.password.reset_token_invalid', actor: user.username, target: user.username, details: { reason: 'expired_token' } });
     return res.status(400).json({ error: 'Reset token has expired' });
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
   db.prepare('UPDATE users SET password = ?, resetToken = NULL, resetTokenExpires = NULL WHERE username = ?')
     .run(hashedPassword, user.username);
+  logEvent(req, { type: 'auth.password.reset_via_token', actor: user.username, target: user.username });
 
   res.json({ success: true, message: 'Password has been reset' });
 });
@@ -543,6 +635,7 @@ app.post('/api/user/:username/photo', upload.single('photo'), (req, res) => {
 
   const photoUrl = `/uploads/${req.file.filename}`;
   db.prepare('UPDATE users SET profilePhoto = ? WHERE username = ?').run(photoUrl, username);
+  logEvent(req, { type: 'user.photo.uploaded', target: username, details: { filename: req.file.filename, sizeBytes: req.file.size } });
 
   res.json({ success: true, profilePhoto: photoUrl });
 });
@@ -564,6 +657,7 @@ app.delete('/api/user/:username/photo', (req, res) => {
   }
 
   db.prepare('UPDATE users SET profilePhoto = NULL WHERE username = ?').run(username);
+  logEvent(req, { type: 'user.photo.deleted', target: username });
   res.json({ success: true });
 });
 
@@ -588,6 +682,7 @@ app.delete('/api/admin/user/:username', requireAdmin, (req, res) => {
   }
 
   db.prepare('DELETE FROM users WHERE username = ?').run(username);
+  logEvent(req, { type: 'admin.user.deleted', target: username });
   res.json({ success: true });
 });
 
@@ -596,12 +691,13 @@ app.put('/api/admin/user/:username/admin', requireAdmin, (req, res) => {
   const { username } = req.params;
   const { isAdmin } = req.body;
 
-  const user = db.prepare('SELECT username FROM users WHERE username = ?').get(username);
+  const user = db.prepare('SELECT username, isAdmin FROM users WHERE username = ?').get(username);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
 
   db.prepare('UPDATE users SET isAdmin = ? WHERE username = ?').run(isAdmin ? 1 : 0, username);
+  logEvent(req, { type: 'admin.user.role_changed', target: username, details: { from: !!user.isAdmin, to: !!isAdmin } });
   res.json({ success: true, username, isAdmin: !!isAdmin });
 });
 
@@ -619,6 +715,7 @@ app.post('/api/admin/user/:username/reset-token', requireAdmin, (req, res) => {
 
   db.prepare('UPDATE users SET resetToken = ?, resetTokenExpires = ? WHERE username = ?')
     .run(resetToken, resetTokenExpires, username);
+  logEvent(req, { type: 'admin.password.reset_link_generated', target: username, details: { expiresAt: new Date(resetTokenExpires).toISOString() } });
 
   res.json({
     success: true,
@@ -681,6 +778,7 @@ app.post('/api/admin/import', requireAdmin, async (req, res) => {
   }
 
   const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  logEvent(req, { type: 'admin.users.imported', details: { mode: mode || 'merge', count } });
   res.json({ success: true, count });
 });
 
@@ -689,6 +787,7 @@ app.post('/api/invite', requireAuth, (req, res) => {
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare('INSERT INTO invite_tokens (token, created_by, created_at) VALUES (?, ?, ?)')
     .run(token, req.user.username, Date.now());
+  logEvent(req, { type: 'invite.created', actor: req.user.username, target: req.user.username, details: { tokenPrefix: token.slice(0, 8) } });
   res.json({ token });
 });
 
@@ -716,8 +815,50 @@ app.delete('/api/admin/invite/:token', requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'Cannot revoke a used token' });
   }
   db.prepare('UPDATE invite_tokens SET revoked = 1 WHERE token = ?').run(token);
+  logEvent(req, { type: 'invite.revoked', target: invite.created_by, details: { tokenPrefix: token.slice(0, 8) } });
   res.json({ success: true });
 });
+
+// Admin: Audit log query
+app.get('/api/admin/audit', requireAdmin, (req, res) => {
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+  const { actor, target, eventType, dateFrom, dateTo } = req.query;
+
+  const where = [];
+  const args = [];
+  if (actor)     { where.push('actor LIKE ?');   args.push(`%${actor}%`); }
+  if (target)    { where.push('target LIKE ?');  args.push(`%${target}%`); }
+  if (eventType) { where.push('event_type = ?'); args.push(eventType); }
+  if (dateFrom)  { const t = parseInt(dateFrom, 10); if (!isNaN(t)) { where.push('timestamp >= ?'); args.push(t); } }
+  if (dateTo)    { const t = parseInt(dateTo, 10);   if (!isNaN(t)) { where.push('timestamp <= ?'); args.push(t); } }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const total = db.prepare(`SELECT COUNT(*) AS c FROM audit_events ${whereSql}`).get(...args).c;
+  const rows = db.prepare(
+    `SELECT id, timestamp, event_type, actor, target, details, ip, user_agent
+     FROM audit_events ${whereSql}
+     ORDER BY timestamp DESC, id DESC
+     LIMIT ? OFFSET ?`
+  ).all(...args, limit, offset);
+
+  const events = rows.map(r => ({
+    id: r.id,
+    timestamp: r.timestamp,
+    eventType: r.event_type,
+    actor: r.actor,
+    target: r.target,
+    details: r.details ? safeParseJson(r.details) : null,
+    ip: r.ip,
+    userAgent: r.user_agent,
+  }));
+
+  res.json({ events, total, limit, offset });
+});
+
+function safeParseJson(s) {
+  try { return JSON.parse(s); } catch { return { _raw: s }; }
+}
 
 // Admin: Export calendar events
 app.get('/api/admin/events/export', requireAdmin, (req, res) => {
@@ -921,6 +1062,7 @@ app.post('/api/admin/events/import', requireAdmin, (req, res) => {
   });
   tx();
   const count = db.prepare('SELECT COUNT(*) as count FROM calendar_events').get().count;
+  logEvent(req, { type: 'admin.events.imported', details: { mode: mode || 'merge', count } });
   res.json({ success: true, count });
 });
 
@@ -1115,6 +1257,7 @@ app.post('/api/events', requireAuth, (req, res) => {
     now
   );
   const event = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(result.lastInsertRowid);
+  logEvent(req, { type: 'event.created', target: String(event.id), details: { title: event.title, visibility: event.visibility } });
   res.json(event);
 });
 
@@ -1131,6 +1274,15 @@ app.put('/api/events/:id', requireAuth, (req, res) => {
   if (visibility && !['community', 'personal'].includes(visibility)) {
     return res.status(400).json({ error: 'visibility must be community or personal' });
   }
+  const changedFields = [];
+  if (title !== undefined && title !== event.title) changedFields.push('title');
+  if (event_date !== undefined && event_date !== event.event_date) changedFields.push('event_date');
+  if (event_time !== undefined && (event_time || null) !== event.event_time) changedFields.push('event_time');
+  if (end_date !== undefined && end_date !== (event.end_date || '')) changedFields.push('end_date');
+  if (description !== undefined && description !== event.description) changedFields.push('description');
+  if (location !== undefined && location !== event.location) changedFields.push('location');
+  if (visibility !== undefined && visibility !== event.visibility) changedFields.push('visibility');
+  if (recurrence !== undefined && recurrence !== event.recurrence) changedFields.push('recurrence');
   db.prepare(
     `UPDATE calendar_events SET title = ?, event_date = ?, event_time = ?, end_date = ?, description = ?, location = ?, visibility = ?, recurrence = ?, updated_at = ?
      WHERE id = ?`
@@ -1147,6 +1299,7 @@ app.put('/api/events/:id', requireAuth, (req, res) => {
     req.params.id
   );
   const updated = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(req.params.id);
+  logEvent(req, { type: 'event.updated', target: String(event.id), details: { changedFields } });
   res.json(updated);
 });
 
@@ -1160,6 +1313,7 @@ app.delete('/api/events/:id', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Only the creator or admin can delete' });
   }
   db.prepare('DELETE FROM calendar_events WHERE id = ?').run(req.params.id);
+  logEvent(req, { type: 'event.deleted', target: String(event.id), details: { title: event.title } });
   res.json({ success: true });
 });
 
