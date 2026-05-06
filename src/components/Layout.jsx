@@ -20,6 +20,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import MapIcon from '@mui/icons-material/Map';
+import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -39,6 +40,7 @@ function Layout() {
   const menuItems = [
     { text: 'Profile', icon: <PersonIcon />, path: '/app/profile' },
     { text: 'Map View', icon: <MapIcon />, path: '/app/map' },
+    { text: 'Members', icon: <PeopleIcon />, path: '/app/members' },
     { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/app/calendar' },
     ...(isAdmin ? [{ text: 'Admin', icon: <AdminPanelSettingsIcon />, path: '/app/admin' }] : []),
   ];

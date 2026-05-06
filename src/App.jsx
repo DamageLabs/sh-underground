@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
 import MapView from './pages/MapView';
+import MembersDirectory from './pages/MembersDirectory';
 import AdminDashboard from './pages/AdminDashboard';
 import CalendarPage from './pages/CalendarPage';
 
@@ -28,6 +29,7 @@ function App() {
         <Route index element={<Navigate to="/app/profile" replace />} />
         <Route path="profile" element={<Profile />} />
         <Route path="map" element={<MapView />} />
+        <Route path="members" element={<MembersDirectory />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="admin" element={<AdminDashboard />} />
       </Route>

@@ -33,6 +33,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api';
+import MarkerColorDot from '../components/MarkerColorDot';
 
 const MARKER_COLOR_LABELS = {
   red: 'Red',
@@ -379,11 +380,7 @@ function Profile() {
               {markerColors.map((color) => (
                 <MenuItem key={color} value={color}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <img
-                      src={`http://maps.google.com/mapfiles/ms/icons/${color}-dot.png`}
-                      alt={color}
-                      style={{ width: 20, height: 20 }}
-                    />
+                    <MarkerColorDot color={color} size={20} alt={color} />
                     {MARKER_COLOR_LABELS[color] || color}
                   </Box>
                 </MenuItem>

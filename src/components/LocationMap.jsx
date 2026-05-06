@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 
@@ -18,9 +18,10 @@ const getPhotoUrl = (photoPath) => {
   return `/api${photoPath}`;
 };
 
-function LocationMap({ coordinates, locationName, username, fullName, displayName, markerColor = 'red', profilePhoto = null, otherUsers = [], onMapClick }) {
+function LocationMap({ coordinates, locationName, username, fullName, displayName, markerColor = 'red', profilePhoto = null, otherUsers = [], onMapClick, focusUsername = null }) {
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const mapRef = useRef(null);
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
@@ -28,6 +29,24 @@ function LocationMap({ coordinates, locationName, username, fullName, displayNam
   });
 
   const center = defaultCenter;
+
+  useEffect(() => {
+    if (!isLoaded || !focusUsername || !mapRef.current) return;
+    if (focusUsername === username && coordinates) {
+      mapRef.current.panTo(coordinates);
+      mapRef.current.setZoom(8);
+      setInfoWindowOpen(true);
+      setSelectedUser(null);
+      return;
+    }
+    const target = otherUsers.find((p) => p.username === focusUsername);
+    if (target?.coordinates) {
+      mapRef.current.panTo(target.coordinates);
+      mapRef.current.setZoom(8);
+      setSelectedUser(target);
+      setInfoWindowOpen(false);
+    }
+  }, [isLoaded, focusUsername, otherUsers, username, coordinates]);
 
   const handleMarkerClick = useCallback(() => {
     setInfoWindowOpen(true);
@@ -78,6 +97,7 @@ function LocationMap({ coordinates, locationName, username, fullName, displayNam
       center={center}
       zoom={4}
       onClick={handleMapClick}
+      onLoad={(map) => { mapRef.current = map; }}
     >
       {coordinates && (
         <MarkerF
