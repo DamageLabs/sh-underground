@@ -242,6 +242,25 @@ export const api = {
     return res.json();
   },
 
+  async getAuditEvents(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.actor)     qs.set('actor', params.actor);
+    if (params.target)    qs.set('target', params.target);
+    if (params.eventType) qs.set('eventType', params.eventType);
+    if (params.dateFrom != null) qs.set('dateFrom', String(params.dateFrom));
+    if (params.dateTo   != null) qs.set('dateTo',   String(params.dateTo));
+    if (params.limit    != null) qs.set('limit',    String(params.limit));
+    if (params.offset   != null) qs.set('offset',   String(params.offset));
+    const res = await fetch(`${API_BASE}/admin/audit?${qs.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to load audit events');
+    }
+    return res.json();
+  },
+
   async revokeInvite(token) {
     const res = await fetch(`${API_BASE}/admin/invite/${token}`, {
       method: 'DELETE',
