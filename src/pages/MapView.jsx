@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Paper, Alert, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import EditLocationIcon from '@mui/icons-material/EditLocation';
 import LocationMap from '../components/LocationMap';
@@ -10,6 +10,8 @@ import { api } from '../api';
 function MapView() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusUsername = searchParams.get('focus');
   const [otherUsers, setOtherUsers] = useState([]);
 
   const hasLocation = user?.location && user?.coordinates;
@@ -24,6 +26,7 @@ function MapView() {
             id: u.username,
             username: u.username,
             fullName: u.fullName,
+            displayName: u.displayName,
             coordinates: u.coordinates,
             location: u.location,
             markerColor: u.markerColor || 'red',
@@ -84,6 +87,7 @@ function MapView() {
               markerColor={user.markerColor}
               profilePhoto={user.profilePhoto}
               otherUsers={otherUsers}
+              focusUsername={focusUsername}
             />
           </Paper>
 
