@@ -5,9 +5,9 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import { useAuth } from '../contexts/AuthContext';
 
 const steps = [
-  { icon: <LocationOnIcon sx={{ fontSize: 48, color: '#fff' }} />, title: 'Get Invited', description: 'Get an invite link from a member' },
-  { icon: <LocationOnIcon sx={{ fontSize: 48, color: '#fff' }} />, title: 'Set Location', description: 'Pin your city on the map' },
-  { icon: <GroupsIcon sx={{ fontSize: 48, color: '#fff' }} />, title: 'Connect', description: 'Find and link up with members nearby' },
+  { icon: <LocationOnIcon sx={{ fontSize: 48, color: 'primary.main' }} />, title: 'Get Invited', description: 'Get an invite link from a member' },
+  { icon: <LocationOnIcon sx={{ fontSize: 48, color: 'primary.main' }} />, title: 'Set Location', description: 'Pin your city on the map' },
+  { icon: <GroupsIcon sx={{ fontSize: 48, color: 'primary.main' }} />, title: 'Connect', description: 'Find and link up with members nearby' },
 ];
 
 function LandingPage() {
@@ -22,7 +22,7 @@ function LandingPage() {
     <Box
       sx={{
         minHeight: '100vh',
-        backgroundColor: '#0a0a0a',
+        bgcolor: 'background.default',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -35,7 +35,7 @@ function LandingPage() {
         alt="SH Underground"
         sx={{ width: 200, height: 200, mb: 3, borderRadius: 2 }}
       />
-      <Typography variant="h3" sx={{ color: '#ffffff', fontWeight: 'bold', mb: 1 }}>
+      <Typography variant="h3" sx={{ color: 'text.primary', fontWeight: 'bold', mb: 1 }}>
         SH Underground
       </Typography>
       <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
@@ -43,15 +43,16 @@ function LandingPage() {
       </Typography>
       <Button
         variant="outlined"
+        color="primary"
         size="large"
         onClick={() => navigate('/login')}
-        sx={{ px: 4, color: '#fff', borderColor: '#fff', '&:hover': { borderColor: '#ccc', color: '#ccc' } }}
+        sx={{ px: 4 }}
       >
         Login
       </Button>
 
       <Box sx={{ mt: 8, px: 2, maxWidth: 900, width: '100%' }}>
-        <Typography variant="h5" sx={{ color: '#fff', textAlign: 'center', mb: 4 }}>
+        <Typography variant="h5" sx={{ color: 'text.primary', textAlign: 'center', mb: 4 }}>
           How It Works
         </Typography>
         <Stack
@@ -68,12 +69,12 @@ function LandingPage() {
                 flex: 1,
                 p: 3,
                 textAlign: 'center',
-                backgroundColor: '#1a1a1a',
+                bgcolor: 'background.paper',
                 borderRadius: 2,
               }}
             >
               {step.icon}
-              <Typography variant="h6" sx={{ color: '#fff', mt: 1.5, mb: 1 }}>
+              <Typography variant="h6" sx={{ color: 'text.primary', mt: 1.5, mb: 1 }}>
                 {i + 1}. {step.title}
               </Typography>
               <Typography variant="body2" color="text.secondary">

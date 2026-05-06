@@ -32,7 +32,9 @@ Required Google APIs: Maps JavaScript API, Geocoding API
 
 ### Application Structure
 
-**Entry Point**: `src/main.jsx` - Sets up MUI theme (dark mode with gold #D4AF37 accents), BrowserRouter, and AuthProvider.
+**Entry Point**: `src/main.jsx` - Mounts BrowserRouter, ThemeProvider (light/dark theme with gold `#D4AF37` accents), and AuthProvider.
+
+**Theme**: `src/theme.js` exposes `getTheme(mode)`. `src/contexts/ThemeContext.jsx` provides `useThemeMode()` returning `{ mode, toggleMode }`. First visit follows `prefers-color-scheme`; subsequent visits read `localStorage['sh_theme_mode']`. The toggle lives in the AppBar in `Layout.jsx`.
 
 **Routing**: `src/App.jsx` - Defines routes with protected route wrapper:
 - `/login`, `/register` - Public auth pages

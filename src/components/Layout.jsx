@@ -23,7 +23,10 @@ import MapIcon from '@mui/icons-material/Map';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 import { useAuth } from '../contexts/AuthContext';
+import { useThemeMode } from '../contexts/ThemeContext';
 import MiniCalendar from './MiniCalendar';
 
 const drawerWidth = 240;
@@ -31,6 +34,7 @@ const drawerWidth = 240;
 function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout, isAdmin } = useAuth();
+  const { mode, toggleMode } = useThemeMode();
 
   const menuItems = [
     { text: 'Profile', icon: <PersonIcon />, path: '/app/profile' },
@@ -115,6 +119,15 @@ function Layout() {
           <Typography variant="body2" sx={{ mr: 2 }}>
             {user?.username}
           </Typography>
+          <IconButton
+            color="inherit"
+            onClick={toggleMode}
+            aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}
+            sx={{ mr: 1 }}
+          >
+            {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
           <Button
             color="inherit"
             onClick={handleLogout}
