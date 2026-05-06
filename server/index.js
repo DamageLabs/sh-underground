@@ -109,6 +109,19 @@ db.exec(`
   )
 `);
 
+const createdAtColumns = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+if (!createdAtColumns.includes('created_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN created_at INTEGER');
+  db.exec(`
+    UPDATE users
+       SET created_at = (
+         SELECT it.used_at FROM invite_tokens it
+          WHERE it.used_by = users.username
+       )
+     WHERE created_at IS NULL
+  `);
+}
+
 // Create calendar_events table
 db.exec(`
   CREATE TABLE IF NOT EXISTS calendar_events (
@@ -191,6 +204,7 @@ const formatUser = (row) => ({
   profilePhoto: row.profilePhoto || null,
   birthday: row.birthday || '',
   displayName: row.display_name || '',
+  createdAt: row.created_at || null,
 });
 
 const formatUserSession = (row) => ({
@@ -250,9 +264,9 @@ app.post('/api/register', async (req, res) => {
     }
 
     db.prepare(`
-      INSERT INTO users (username, password, fullName, location, latitude, longitude, isAdmin)
-      VALUES (?, ?, '', NULL, NULL, NULL, 0)
-    `).run(username, hashedPassword);
+      INSERT INTO users (username, password, fullName, location, latitude, longitude, isAdmin, created_at)
+      VALUES (?, ?, '', NULL, NULL, NULL, 0, ?)
+    `).run(username, hashedPassword, Date.now());
 
     db.prepare('UPDATE invite_tokens SET used_by = ?, used_at = ? WHERE token = ?')
       .run(username, Date.now(), inviteToken);
@@ -497,10 +511,12 @@ app.get('/api/users', (req, res) => {
   res.json(users.map(u => ({
     username: u.username,
     fullName: u.fullName || '',
+    displayName: u.display_name || '',
     location: u.location,
     coordinates: u.latitude && u.longitude ? { lat: u.latitude, lng: u.longitude } : null,
     markerColor: u.markerColor || 'red',
     profilePhoto: u.profilePhoto || null,
+    createdAt: u.created_at || null,
   })));
 });
 
