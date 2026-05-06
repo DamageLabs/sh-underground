@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Box, Typography, Button, IconButton, Chip, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, RadioGroup, FormControlLabel,
-  Radio, FormControl, FormLabel,
+  Radio, FormControl, FormLabel, Link,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddIcon from '@mui/icons-material/Add';
@@ -418,7 +419,7 @@ function CalendarPage() {
                     <Box
                       key={`${weekIndex}-${dayIndex}`}
                       onClick={() => d && setSelectedDay(d)}
-                      sx={{
+                      sx={(theme) => ({
                         minHeight: 100,
                         p: 0.5,
                         pt: 2, // Extra padding top for spanning bars
@@ -426,11 +427,11 @@ function CalendarPage() {
                         borderRight: dayIndex < 6 ? '1px solid' : 'none',
                         borderColor: 'divider',
                         cursor: d ? 'pointer' : 'default',
-                        bgcolor: d === selectedDay ? 'rgba(212,175,55,0.08)' : 'transparent',
+                        bgcolor: d === selectedDay ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
                         borderLeft: isToday(d) ? '3px solid' : 'none',
                         borderLeftColor: isToday(d) ? 'primary.main' : 'transparent',
-                        '&:hover': d ? { bgcolor: 'rgba(212,175,55,0.04)' } : {},
-                      }}
+                        '&:hover': d ? { bgcolor: alpha(theme.palette.primary.main, 0.04) } : {},
+                      })}
                     >
                       {d && (
                         <>
@@ -446,12 +447,12 @@ function CalendarPage() {
                                 key={evt.id}
                                 label={evt.title}
                                 size="small"
-                                sx={{
+                                sx={(theme) => ({
                                   height: 18, fontSize: '0.65rem', mb: 0.25, maxWidth: '100%',
-                                  bgcolor: evt.visibility === 'community' ? 'rgba(212,175,55,0.2)' : 'action.selected',
+                                  bgcolor: evt.visibility === 'community' ? alpha(theme.palette.primary.main, 0.2) : 'action.selected',
                                   color: evt.visibility === 'community' ? 'primary.main' : 'text.secondary',
                                   '& .MuiChip-label': { px: 0.5 },
-                                }}
+                                })}
                               />
                             ))}
                             {singleDayEvents.length > maxShow && (
@@ -479,28 +480,33 @@ function CalendarPage() {
                         const firstDay = weekCells[evt.startCol];
                         if (firstDay) setSelectedDay(firstDay);
                       }}
-                      sx={{
-                        position: 'absolute',
-                        top: 4,
-                        left: `${leftPercentage}%`,
-                        width: `${widthPercentage}%`,
-                        height: 20,
-                        backgroundColor: evt.visibility === 'community' ? 'rgba(212, 175, 55, 0.3)' : 'rgba(158, 158, 158, 0.3)',
-                        border: '1px solid',
-                        borderColor: evt.visibility === 'community' ? 'rgba(212, 175, 55, 0.6)' : 'rgba(158, 158, 158, 0.6)',
-                        borderRadius: 1,
-                        borderTopLeftRadius: evt.startsBeforeWeek ? 0 : 1,
-                        borderBottomLeftRadius: evt.startsBeforeWeek ? 0 : 1,
-                        borderTopRightRadius: evt.endsAfterWeek ? 0 : 1,
-                        borderBottomRightRadius: evt.endsAfterWeek ? 0 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        px: 1,
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        '&:hover': {
-                          backgroundColor: evt.visibility === 'community' ? 'rgba(212, 175, 55, 0.4)' : 'rgba(158, 158, 158, 0.4)',
-                        },
+                      sx={(theme) => {
+                        const accent = evt.visibility === 'community'
+                          ? theme.palette.primary.main
+                          : theme.palette.text.secondary;
+                        return {
+                          position: 'absolute',
+                          top: 4,
+                          left: `${leftPercentage}%`,
+                          width: `${widthPercentage}%`,
+                          height: 20,
+                          backgroundColor: alpha(accent, 0.3),
+                          border: '1px solid',
+                          borderColor: alpha(accent, 0.6),
+                          borderRadius: 1,
+                          borderTopLeftRadius: evt.startsBeforeWeek ? 0 : 1,
+                          borderBottomLeftRadius: evt.startsBeforeWeek ? 0 : 1,
+                          borderTopRightRadius: evt.endsAfterWeek ? 0 : 1,
+                          borderBottomRightRadius: evt.endsAfterWeek ? 0 : 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          px: 1,
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          '&:hover': {
+                            backgroundColor: alpha(accent, 0.4),
+                          },
+                        };
                       }}
                     >
                       <Typography
@@ -508,7 +514,7 @@ function CalendarPage() {
                         sx={{
                           fontSize: '0.65rem',
                           fontWeight: 500,
-                          color: evt.visibility === 'community' ? 'rgba(212, 175, 55, 1)' : 'rgba(97, 97, 97, 1)',
+                          color: evt.visibility === 'community' ? 'primary.main' : 'text.secondary',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -548,11 +554,11 @@ function CalendarPage() {
                 <Chip
                   label={evt.visibility}
                   size="small"
-                  sx={{
+                  sx={(theme) => ({
                     height: 20, fontSize: '0.7rem',
-                    bgcolor: evt.visibility === 'community' ? 'rgba(212,175,55,0.15)' : 'action.selected',
+                    bgcolor: evt.visibility === 'community' ? alpha(theme.palette.primary.main, 0.15) : 'action.selected',
                     color: evt.visibility === 'community' ? 'primary.main' : 'text.secondary',
-                  }}
+                  })}
                 />
                 <IconButton size="small" onClick={() => handleDownloadIcs(evt)} title="Download .ics"><DownloadIcon fontSize="small" /></IconButton>
                 {evt.created_by === user?.username && (
@@ -596,9 +602,9 @@ function CalendarPage() {
                 <Typography variant="body2" component="div" sx={{ mt: 1, color: 'text.secondary', whiteSpace: 'pre-line' }}>
                   {evt.description.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
                     /^https?:\/\//.test(part) ? (
-                      <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: '#D4AF37' }}>
+                      <Link key={i} href={part} target="_blank" rel="noopener noreferrer" color="primary">
                         {part}
-                      </a>
+                      </Link>
                     ) : part
                   )}
                 </Typography>
